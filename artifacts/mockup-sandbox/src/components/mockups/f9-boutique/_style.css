@@ -10,7 +10,7 @@
   background: var(--ivory);
   color: var(--ink);
   font-family: Poppins, sans-serif;
-  font-size: 13px;
+  font-size: 15px;
   line-height: 1.7;
   font-weight: 400;
 }
@@ -20,7 +20,7 @@
 .f9 button:focus-visible,.f9 a:focus-visible,.f9 input:focus-visible,.f9 select:focus-visible { outline: 2px solid #9d8060; outline-offset: 4px; }
 .f9 h1,.f9 h2,.f9 h3,.f9 p { margin: 0; }
 .f9 h1,.f9 h2,.f9 h3,.f9 .serif { font-family: 'Playfair Display',serif; font-weight: 400; line-height: 1.18; }
-.f9[dir=rtl],.f9[dir=rtl] input,.f9[dir=rtl] button { font-family: 'Noto Naskh Arabic',serif; font-size: 16px; }
+.f9[dir=rtl],.f9[dir=rtl] input,.f9[dir=rtl] button { font-family: 'Noto Naskh Arabic',serif; font-size: 18px; }
 .f9[dir=rtl] h1,.f9[dir=rtl] h2,.f9[dir=rtl] h3 { font-family: 'Noto Naskh Arabic',serif; }
 .f9 img { display: block; width: 100%; height: 100%; object-fit: cover; }
 .f9 svg { width: 19px; height: 19px; stroke-width: 1.35; flex-shrink: 0; }
@@ -235,7 +235,7 @@
   .f9 .detail-info h1 { font-size: 34px; }
 }
 @media (max-width:767px) {
-  .f9 { font-size: 12px; }
+  .f9 { font-size: 14px; }
   .f9 .announcement { font-size: 7px; letter-spacing: 1.3px; padding: 8px; }
   .f9 .masthead { height: 83px; padding: 0 4%; }
   .f9 .logo strong { font-size: 36px; }
@@ -334,4 +334,98 @@
   .f9[dir=rtl] .nav button { font-size: 13px; }
   .f9[dir=rtl] .product-name { font-size: 14px; }
   .f9[dir=rtl] .btn { font-size: 12px; letter-spacing: 0; }
+}
+
+/* Readability pass: enlarge supporting copy and controls without touching display headings. */
+.f9 .eyebrow { font-size: 12px; }
+.f9 .btn { font-size: 12px; }
+.f9 .text-link { font-size: 13px; }
+.f9 .icon-btn small { font-size: 12px; }
+.f9 .announcement { font-size: 11px; }
+.f9 .logo span { font-size: 9px; }
+.f9 .place, .f9 .nav button { font-size: 13px; }
+.f9 .hero p, .f9 .editorial p, .f9 .page-intro p, .f9 .account-form p,
+.f9 .info-content p { font-size: 15px; }
+.f9 .hero-bottom, .f9 .promise { font-size: 11px; }
+.f9 .view-product { font-size: 11px !important; }
+.f9 .product-tag { font-size: 10px; }
+.f9 .boutique-name { font-size: 11px; }
+.f9 .product-name { font-size: 14px; }
+.f9 .product-price { font-size: 13px; }
+.f9 .product-options, .f9 .compare-check { font-size: 12px; }
+.f9 .tabs button { font-size: 14px; }
+.f9 .boutique-row p { font-size: 13px; }
+.f9 .boutique-index { font-size: 11px; }
+.f9 .footer p, .f9 .footer-links button { font-size: 13px; }
+.f9 .footer-bottom { font-size: 11px; }
+.f9 .toolbar > span, .f9 .toolbar button, .f9 .toolbar select,
+.f9 .filter-panel label, .f9 .filter-panel select, .f9 .filter-panel input,
+.f9 .result-note, .f9 .choice-label, .f9 .choices button,
+.f9 .breadcrumb, .f9 .bag-item p, .f9 .bag-item-price,
+.f9 .remove, .f9 .summary-line, .f9 .order-summary p,
+.f9 .compare-bar, .f9 .compare-bar .btn, .f9 .dialog p,
+.f9 .size-table td, .f9 .size-table th, .f9 .toast,
+.f9 details, .f9 details p { font-size: 14px; }
+.f9 .menu-panel button { font-size: 15px; }
+
+@media (max-width:767px) {
+  .f9 { font-size: 14px; }
+  .f9 .announcement { font-size: 10px; }
+  .f9 .logo span { font-size: 7px; }
+  .f9 .lang { font-size: 12px; }
+  .f9 .hero .eyebrow, .f9 .category .eyebrow, .f9 .section-head .eyebrow { font-size: 9px; }
+  .f9 .hero p { font-size: 14px; }
+  .f9 .hero .btn, .f9 .btn { font-size: 12px; }
+  .f9 .hero-bottom { font-size: 9px; }
+  .f9 .promise { font-size: 9px; }
+  .f9 .text-link { font-size: 11px; }
+  .f9 .product-name { font-size: 13px; }
+  .f9 .boutique-name { font-size: 11px; }
+  .f9 .product-price { font-size: 12px; }
+  .f9 .product-options, .f9 .compare-check { font-size: 11px; }
+  .f9 .view-product { font-size: 11px !important; }
+  .f9 .product-tag { font-size: 9px; }
+  .f9 .footer-bottom { font-size: 9px; }
+  .f9 .page-intro p { font-size: 14px; }
+  .f9 .toolbar > span, .f9 .toolbar button, .f9 .toolbar select { font-size: 12px; }
+  .f9 .filter-panel label, .f9 .filter-panel select, .f9 .filter-panel input,
+  .f9 .result-note, .f9 .choice-label, .f9 .choices button,
+  .f9 .breadcrumb, .f9 .bag-item p, .f9 .bag-item-price,
+  .f9 .remove, .f9 .summary-line, .f9 .order-summary p,
+  .f9 .compare-bar, .f9 .compare-bar .btn, .f9 .dialog p,
+  .f9 .size-table td, .f9 .size-table th, .f9 .toast,
+  .f9 details, .f9 details p { font-size: 13px; }
+  .f9 .menu-panel button { font-size: 15px; }
+}
+.f9[dir=rtl] .eyebrow { font-size: 14px; }
+.f9[dir=rtl] .btn, .f9[dir=rtl] .text-link, .f9[dir=rtl] .nav button,
+.f9[dir=rtl] .boutique-name, .f9[dir=rtl] .product-options,
+.f9[dir=rtl] .compare-check { font-size: 16px; }
+.f9[dir=rtl] .hero p, .f9[dir=rtl] .editorial p, .f9[dir=rtl] .page-intro p,
+.f9[dir=rtl] .account-form p, .f9[dir=rtl] .info-content p,
+.f9[dir=rtl] .toolbar > span, .f9[dir=rtl] .toolbar button,
+.f9[dir=rtl] .toolbar select, .f9[dir=rtl] .filter-panel label,
+.f9[dir=rtl] .filter-panel select, .f9[dir=rtl] .filter-panel input,
+.f9[dir=rtl] .choice-label, .f9[dir=rtl] .choices button,
+.f9[dir=rtl] .breadcrumb, .f9[dir=rtl] .bag-item p,
+.f9[dir=rtl] .summary-line, .f9[dir=rtl] .order-summary p,
+.f9[dir=rtl] .dialog p, .f9[dir=rtl] details,
+.f9[dir=rtl] details p { font-size: 16px; }
+@media (max-width:767px) {
+  .f9[dir=rtl] .eyebrow { font-size: 13px; }
+  .f9[dir=rtl] .hero .eyebrow, .f9[dir=rtl] .category .eyebrow,
+  .f9[dir=rtl] .section-head .eyebrow { font-size: 12px; }
+  .f9[dir=rtl] .btn, .f9[dir=rtl] .text-link, .f9[dir=rtl] .nav button,
+  .f9[dir=rtl] .boutique-name, .f9[dir=rtl] .product-options,
+  .f9[dir=rtl] .compare-check { font-size: 14px; }
+  .f9[dir=rtl] .hero p, .f9[dir=rtl] .editorial p, .f9[dir=rtl] .page-intro p,
+  .f9[dir=rtl] .account-form p, .f9[dir=rtl] .info-content p,
+  .f9[dir=rtl] .toolbar > span, .f9[dir=rtl] .toolbar button,
+  .f9[dir=rtl] .toolbar select, .f9[dir=rtl] .filter-panel label,
+  .f9[dir=rtl] .filter-panel select, .f9[dir=rtl] .filter-panel input,
+  .f9[dir=rtl] .choice-label, .f9[dir=rtl] .choices button,
+  .f9[dir=rtl] .breadcrumb, .f9[dir=rtl] .bag-item p,
+  .f9[dir=rtl] .summary-line, .f9[dir=rtl] .order-summary p,
+  .f9[dir=rtl] .dialog p, .f9[dir=rtl] details,
+  .f9[dir=rtl] details p { font-size: 14px; }
 }
