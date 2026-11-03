@@ -1,0 +1,9 @@
+@media (min-width:768px) and (max-width:900px){.f9 .products{grid-template-columns:repeat(3,minmax(0,1fr));}}
+@media (max-width:767px){.f9 .products{grid-template-columns:repeat(2,minmax(0,1fr));}}
+@media (prefers-reduced-motion:reduce){.f9 *{animation:none!important;transition:none!important;scroll-behavior:auto!important}}
+.f9[dir=rtl] .hero-content{margin-inline-start:0;margin-inline-end:auto}
+.f9[dir=rtl] .hero:after{background:linear-gradient(270deg,rgba(41,35,31,.65),rgba(41,35,31,.12) 65%,transparent)}
+.f9[dir=rtl] .hero>img{transform:scaleX(-1)}
+.f9 button:disabled{opacity:.35;cursor:not-allowed}
+.f9 .filter-panel input{max-width:100%}
+@media(max-width:767px){.f9[dir=rtl] .hero:after{background:linear-gradient(0deg,#29231fb0,transparent 85%)}}

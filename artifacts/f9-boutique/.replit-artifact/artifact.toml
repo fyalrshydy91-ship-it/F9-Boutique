@@ -1,0 +1,28 @@
+kind = "web"
+previewPath = "/"
+title = "F9 Boutique"
+description = "F9 Boutique bilingual luxury abaya and womenswear boutique discovery website, preserving the approved design and local demo shopping experience."
+version = "1.0.0"
+id = "artifacts/f9-boutique"
+router = "path"
+
+[[services]]
+name = "web"
+paths = [ "/" ]
+localPort = 25340
+
+[services.development]
+run = "pnpm --filter @workspace/f9-boutique run dev"
+
+[services.production]
+build = [ "pnpm", "--filter", "@workspace/f9-boutique", "run", "build" ]
+serve = "static"
+publicDir = "artifacts/f9-boutique/dist/public"
+
+[[services.production.rewrites]]
+from = "/*"
+to = "/index.html"
+
+[services.env]
+PORT = "25340"
+BASE_PATH = "/"

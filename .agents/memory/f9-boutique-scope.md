@@ -14,3 +14,9 @@ The user wants luxurious model photography and beautiful garment designs while r
 **Why:** These are explicit user requirements, including the instruction not to claim unimplemented commerce connections.
 
 **How to apply:** Keep prototype limitations honest; do not introduce real checkout or authentication without a separate implementation request.
+
+Publishing must preserve the approved design exactly, including later readability and navigation-spacing adjustments.
+
+**Why:** The user explicitly requested fixing public access without changing the design.
+
+**How to apply:** Treat deployment repair as a faithful transfer, not an opportunity to redesign or add commerce services. Preserve the canvas source as a reference.
