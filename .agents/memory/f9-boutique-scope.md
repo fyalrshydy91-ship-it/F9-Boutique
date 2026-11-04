@@ -20,3 +20,9 @@ Publishing must preserve the approved design exactly, including later readabilit
 **Why:** The user explicitly requested fixing public access without changing the design.
 
 **How to apply:** Treat deployment repair as a faithful transfer, not an opportunity to redesign or add commerce services. Preserve the canvas source as a reference.
+
+The user expanded the scope for Day 3 to include real public currency rates and an OpenRouter fashion assistant while keeping the existing design, pages, and shopping behavior. This is an exception to the original frontend-only boundary, not permission to add real checkout or boutique connections.
+
+**Why:** The user explicitly requested the class API and AI requirements in the existing project, not a rebuild.
+
+**How to apply:** Keep external service calls server-side. Use the user's own OpenRouter key in Replit Secrets for this class requirement rather than substituting Replit-billed AI access.

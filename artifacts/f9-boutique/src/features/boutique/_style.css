@@ -34,6 +34,9 @@
 .f9 .icon-btn { display: inline-flex; align-items: center; justify-content: center; gap: 6px; padding: 5px; position: relative; }
 .f9 .icon-btn small { font-size: 9px; }
 .f9 .mobile-only { display: none; }
+.f9 .companion-entry { display:inline-flex; align-items:center; gap:7px; padding:6px 0; color:#756657; border-bottom:1px solid transparent; font-size:10px; letter-spacing:1px; white-space:nowrap; }
+.f9 .companion-entry:hover { border-color:#9d8060; }
+.f9 .companion-entry svg { width:15px; height:15px; }
 
 /* A quiet masthead, a generous cinematic opening. */
 .f9 .announcement { text-align: center; background: var(--ink); color: var(--champagne); font-size: 9px; letter-spacing: 2.1px; padding: 9px 15px; }
@@ -242,6 +245,8 @@
   .f9 .logo span { font-size: 6px; letter-spacing: 3px; margin-top: 9px; }
   .f9 .mast-side { gap: 7px; flex: 1; }
   .f9 .mast-side.end { gap: 8px; }
+  .f9 .companion-entry { gap:4px; font-size:8px; letter-spacing:.3px; }
+  .f9 .companion-entry svg { width:15px; height:15px; }
   .f9 .mast-side .account-icon { display: none; }
   .f9 .icon-btn { padding: 3px; }
   .f9 .icon-btn svg { width: 18px; height: 18px; }

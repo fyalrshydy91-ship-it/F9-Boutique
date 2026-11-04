@@ -11,6 +11,34 @@ tags:
   - name: health
     description: Health operations
 paths:
+  /exchange-rates:
+    get:
+      operationId: getExchangeRates
+      summary: Latest available KWD exchange rates
+      responses:
+        "200":
+          description: Daily reference rates, not checkout prices
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ExchangeRates"
+  /stylist:
+    post:
+      operationId: askStylist
+      summary: Ask the F9 OpenRouter stylist
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/StylistInput"
+      responses:
+        "200":
+          description: AI-generated styling guidance
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StylistReply"
   /healthz:
     get:
       operationId: healthCheck
@@ -26,6 +54,40 @@ paths:
                 $ref: "#/components/schemas/HealthStatus"
 components:
   schemas:
+    ExchangeRates:
+      type: object
+      required: [base, rates, updatedAt, nextUpdateAt, fetchedAt, provider]
+      properties:
+        base: { type: string }
+        rates:
+          type: object
+          additionalProperties: { type: number }
+        updatedAt: { type: string }
+        nextUpdateAt: { type: string }
+        fetchedAt: { type: string }
+        provider: { type: string }
+    StylistMessage:
+      type: object
+      required: [role, content]
+      properties:
+        role: { type: string, enum: [user, assistant] }
+        content: { type: string, minLength: 1, maxLength: 2000 }
+    StylistInput:
+      type: object
+      required: [messages]
+      properties:
+        messages:
+          type: array
+          minItems: 1
+          maxItems: 12
+          items: { $ref: "#/components/schemas/StylistMessage" }
+        language: { type: string, enum: [en, ar], default: en }
+    StylistReply:
+      type: object
+      required: [reply, ratesIncluded]
+      properties:
+        reply: { type: string }
+        ratesIncluded: { type: boolean }
     HealthStatus:
       type: object
       properties:
