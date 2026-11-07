@@ -13,7 +13,7 @@ import './_responsive.css';
 
 type Page='home'|'abayas'|'women'|'new'|'boutiques'|'collection'|'product'|'favorites'|'bag'|'account'|'orders'|'search'|'compare'|'about'|'contact'|'privacy'|'terms'|'instagram'|'companion';
 // Password recovery must leave private Replit previews and return to the public storefront.
-const PASSWORD_RESET_REDIRECT_URL='https://luxury-model-designs.replit.app';
+const PASSWORD_RESET_REDIRECT_URL='https://luxury-model-designs.replit.app/?f9_recovery=1';
 const APPROXIMATE_CURRENCIES=['USD','EUR','GBP','SAR'] as const;
 type PasswordRecoveryUrlState='recovery'|'invalid'|null;
 function getPasswordRecoveryUrlState():PasswordRecoveryUrlState{
@@ -21,18 +21,20 @@ function getPasswordRecoveryUrlState():PasswordRecoveryUrlState{
  const query=new URLSearchParams(window.location.search);
  const fragment=new URLSearchParams(window.location.hash.replace(/^#/,''));
  const params=[query,fragment];
- const get=(key:string)=>params.map(value=>value.get(key)||'').join(' ').toLowerCase();
+ const get=(key:string)=>params.map(value=>value.get(key)||'').join(' ').trim().toLowerCase();
  const type=get('type');
+ const recoveryMarker=get('f9_recovery')==='1';
+ const isRecovery=type.split(/\s+/).includes('recovery')||recoveryMarker;
  const error=get('error');
  const errorCode=get('error_code');
  const description=get('error_description');
- if(errorCode.startsWith('otp_')||errorCode.includes('flow_state')||errorCode==='invalid_grant'||error==='access_denied'||/email link|expired|invalid|already used|recovery|otp/i.test(`${error} ${description}`))return 'invalid';
- return type.split(/\s+/).includes('recovery')?'recovery':null;
+ if(isRecovery&&(errorCode.startsWith('otp_')||errorCode.includes('flow_state')||errorCode==='invalid_grant'||error==='access_denied'||/email link|expired|invalid|already used|recovery|otp/i.test(`${error} ${description}`)))return 'invalid';
+ return isRecovery?'recovery':null;
 }
 function clearSupabaseAuthCallbackFromUrl(){
  if(typeof window==='undefined')return;
  const url=new URL(window.location.href);
- for(const key of ['access_token','refresh_token','expires_in','expires_at','token_type','type','error','error_code','error_description','code','state','token_hash','provider_token','provider_refresh_token'])url.searchParams.delete(key);
+ for(const key of ['access_token','refresh_token','expires_in','expires_at','token_type','type','error','error_code','error_description','code','state','token_hash','provider_token','provider_refresh_token','f9_recovery'])url.searchParams.delete(key);
  url.hash='';
  window.history.replaceState(window.history.state,document.title,`${url.pathname}${url.search}`);
 }
@@ -401,20 +403,55 @@ export function Boutique({products,boutiques,lang,setLang}:Catalog & {lang:'en'|
    <div style={{marginTop:65}}>{sectionHead(t('A LITTLE MORE TO LOVE','المزيد من الجمال'),t('You may also love','قد يعجبك أيضاً'))}<div className="products">{products.filter(p=>p.id!==product.id).slice(0,4).map(card)}</div></div>
   </section>}
   {page==='bag'&&<><div className="page-intro"><span className="eyebrow">{t('BEAUTIFUL CHOICES','اختيارات جميلة')}</span><h1>{title(page)} <span className="serif">({count})</span></h1><p>{t('Your edit, one beautiful piece at a time.','مختاراتك، قطعة جميلة تلو الأخرى.')}</p></div>{bag.length?<div className="bag-layout"><div>{bag.map((item,index)=>{const p=products.find(p=>p.id===item.id);if(!p)return <div className="bag-item" key={`${item.id}-${item.size}-${item.color}`}><p>{t('This piece is no longer available. It is excluded from your total.','هذه القطعة لم تعد متاحة، وهي غير محسوبة في الإجمالي.')}</p><button className="remove" onClick={()=>removeBag(index)}>{t('Remove','إزالة')}</button></div>;return <div className="bag-item" key={`${item.id}-${item.size}-${item.color}`}><button onClick={()=>openProduct(p)}><img src={image(p.image)} alt={ar?p.ar:p.name}/></button><div className="bag-item-info"><button className="boutique-name" onClick={()=>visitBrand(p.brand)}>{ar?boutiqueFor(p.brand).ar:boutiqueFor(p.brand).name}</button><h3>{ar?p.ar:p.name}</h3><p>{t('Size','المقاس')}: {item.size} / {ar?p.colors.find(c=>c[0]===item.color)?.[1]:item.color}</p><div className="quantity"><button disabled={item.qty===1} onClick={()=>updateQty(index,-1)} aria-label={t('Decrease quantity','تقليل الكمية')}><Minus/></button><span>{item.qty}</span><button onClick={()=>updateQty(index,1)} aria-label={t('Increase quantity','زيادة الكمية')}><Plus/></button></div><button className="remove" onClick={()=>removeBag(index)}>{t('Remove','إزالة')}</button></div><span className="bag-item-price">{money(p.price*item.qty)}</span></div>})}</div><aside className="order-summary"><h2>{t('Your selection','مختاراتك')}</h2><div className="summary-line"><span>{t('Subtotal','المجموع الفرعي')}</span><span>{money(total)}</span></div><div className="summary-line"><span>{t('Delivery','التوصيل')}</span><span>{t('By boutique','حسب البوتيك')}</span></div><div className="summary-line total"><span>{t('Item total','إجمالي القطع')}</span><span>{money(total)}</span></div><button className="btn" onClick={()=>setDialog('checkout')}>{t('REVIEW DEMO BAG','مراجعة الحقيبة التجريبية')}<ArrowRight/></button><p>{t('A frontend prototype. No real orders, payments or delivery. Final delivery fees are not calculated.','نموذج واجهة تجريبي. لا طلبات أو مدفوعات أو توصيل فعلي. رسوم التوصيل النهائية غير محسوبة.')}</p><button className="text-link" style={{marginTop:20}} onClick={()=>go('new')}>{t('Continue discovering','متابعة الاكتشاف')}</button></aside></div>:<div className="empty"><ShoppingBag/><h2>{t('A beautiful beginning.','بداية جميلة.')}</h2><p>{t('Your shopping bag is waiting for something exceptional.','حقيبتك تنتظر قطعة استثنائية.')}</p><button className="btn" onClick={()=>go('new')}>{t('Explore the latest','اكتشفي الأحدث')}</button></div>}</>}
-  {page==='account'&&<section className="account"><div className="account-photo"><img src={image('silk')} alt={t('A private fashion appointment','موعد أزياء خاص')}/></div><div className="account-form"><span className="eyebrow">{t('YOUR PRIVATE APPOINTMENT','موعدك الخاص')}</span><h1>{recoveryMode?t('Choose a new password.','اختاري كلمة مرور جديدة.'):authUser?t('Welcome to F9.','مرحباً بك في F9.'):auth==='signup'?t('A little more you.','عالم يشبهك.'):auth==='forgot'?t('Reset your password.','إعادة تعيين كلمة المرور.'):t('Welcome to F9.','مرحباً بك في F9.')}</h1>
-   {authUser&&!recoveryMode?<><p>{t('Signed in as','تم تسجيل الدخول باسم')} <strong dir="ltr">{authUser.email}</strong></p><p>{t('Your favorites are saved privately to your account. Your shopping bag remains on this device.','تُحفظ مفضلتك لحسابك فقط. تبقى حقيبة التسوق على هذا الجهاز.')}</p><p>{favorites.length} {t('saved favorites','قطع في المفضلة')}{favoriteLoading?` · ${t('Loading…','جارٍ التحميل…')}`:''}</p>{favoriteLoadError&&<p className="auth-error" role="alert">{t('Could not load your saved favorites. Try again from the Favorites page.','تعذر تحميل مفضلتك. حاولي مجدداً من صفحة المفضلة.')}</p>}<button className="text-link" onClick={()=>go('favorites')}>{t('View your favorites','عرض المفضلة')}<ArrowRight/></button><button className="text-link" onClick={()=>go('orders')}>{t('My orders','طلباتي')}<PackageCheck/></button>{authError&&<p className="auth-error" role="alert">{authError}</p>}{authNotice&&<p className="auth-notice" role="status">{authNotice}</p>}<button className="btn" onClick={()=>void signOut()} disabled={authBusy} aria-busy={authBusy}>{authBusy?t('Signing out…','جارٍ تسجيل الخروج…'):t('Sign out','تسجيل الخروج')}</button></>
-  :!authReady?<p role="status">{t('Checking your account…','جارٍ التحقق من حسابك…')}</p>
-  :<>{!recoveryMode&&<p>{auth==='forgot'?t('We will email you a secure password-reset link.','سنرسل رابطاً آمناً لإعادة تعيين كلمة المرور إلى بريدك.'):t('Sign in or create an account to save your favorites across devices. Passwords are handled securely by Supabase Auth.','سجّلي الدخول أو أنشئي حساباً لحفظ مفضلتك بين أجهزتك. تتولى Supabase Auth حماية كلمات المرور.')}</p>}
-  {!recoveryMode&&auth!=='forgot'&&<div className="tabs" role="tablist" aria-label={t('Account access','الدخول إلى الحساب')}><button type="button" role="tab" aria-selected={auth==='login'} className={auth==='login'?'selected':''} onClick={()=>{setAuth('login');setAuthError('');setAuthNotice('');setAccountPassword('')}}>{t('Log in','تسجيل الدخول')}</button><button type="button" role="tab" aria-selected={auth==='signup'} className={auth==='signup'?'selected':''} onClick={()=>{setAuth('signup');setAuthError('');setAuthNotice('');setAccountPassword('');setAccountName('')}}>{t('Sign up','إنشاء حساب')}</button></div>}
-  <form key={`${auth}-${recoveryMode}`} onSubmit={submitAccount}>{recoveryMode
-    ?<label>{t('New password','كلمة المرور الجديدة')}<input required minLength={8} autoComplete="new-password" type="password" value={accountPassword} onChange={event=>setAccountPassword(event.target.value)} placeholder={t('At least 8 characters','٨ أحرف على الأقل')}/></label>
-    :<>{auth==='signup'&&<label>{t('Your name','اسمك')}<input autoComplete="name" value={accountName} onChange={event=>setAccountName(event.target.value)} placeholder={t('Full name','الاسم الكامل')}/></label>}<label>{t('Email address','البريد الإلكتروني')}<input required type="email" autoComplete="email" value={accountEmail} onChange={event=>setAccountEmail(event.target.value)} placeholder="you@example.com"/></label>{auth!=='forgot'&&<label>{t('Password','كلمة المرور')}<input required minLength={8} type="password" autoComplete={auth==='signup'?'new-password':'current-password'} value={accountPassword} onChange={event=>setAccountPassword(event.target.value)} placeholder={t('At least 8 characters','٨ أحرف على الأقل')}/></label>}</>}
-    <button className="btn" type="submit" disabled={authBusy||!authReady} aria-busy={authBusy}>{authBusy?t('Please wait…','يرجى الانتظار…'):recoveryMode?t('UPDATE PASSWORD','تحديث كلمة المرور'):auth==='signup'?t('CREATE ACCOUNT','إنشاء الحساب'):auth==='forgot'?t('SEND RESET LINK','إرسال رابط الاستعادة'):t('LOG IN','تسجيل الدخول')}<ArrowRight/></button>
-  </form>
-  {authError&&<p className="auth-error" role="alert">{authError}</p>}{authNotice&&<p className="auth-notice" role="status" aria-live="polite">{authNotice}</p>}
-  {!recoveryMode&&<button type="button" className="text-link" onClick={()=>{setAuth(auth==='forgot'?'login':'forgot');setAuthError('');setAuthNotice('')}}>{auth==='forgot'?t('Back to log in','العودة لتسجيل الدخول'):t('Forgot your password?','نسيتِ كلمة المرور؟')}</button>}
-  {!authUser&&!recoveryMode&&<p className="auth-privacy">{t('Your password is sent only to Supabase Auth; F9 does not store it. Guest favorites stay on this device.','تُرسل كلمة المرور إلى Supabase Auth فقط، ولا يحفظها F9. تبقى مفضلة الزائرة على هذا الجهاز.')}</p>}
-   </>}{authUser&&!recoveryMode&&<button className="text-link" style={{marginTop:18}} onClick={()=>go('orders')}>{t('My orders','طلباتي')}<PackageCheck/></button>}</div></section>}
+  {page==='account'&&<section className="account">
+   <div className="account-photo"><img src={image('silk')} alt={t('A private fashion appointment','موعد أزياء خاص')}/></div>
+   <div className="account-form">
+    <span className="eyebrow">{t('YOUR PRIVATE APPOINTMENT','موعدك الخاص')}</span>
+    <h1>{recoveryMode?t('Choose a new password.','اختاري كلمة مرور جديدة.'):authUser&&!recoveryLinkInvalid?t('Welcome to F9.','مرحباً بك في F9.'):auth==='signup'?t('A little more you.','عالم يشبهك.'):auth==='forgot'?t('Reset your password.','إعادة تعيين كلمة المرور.'):t('Welcome to F9.','مرحباً بك في F9.')}</h1>
+    {recoveryLinkInvalid&&<p className="auth-error" role="alert">{t('This password reset link is invalid, expired, or already used. Request another reset email below.','رابط إعادة تعيين كلمة المرور غير صالح أو منتهي الصلاحية أو مستخدم مسبقاً. اطلبي رابطاً جديداً أدناه.')}</p>}
+    {authUser&&!recoveryMode&&!recoveryLinkInvalid?<>
+     <p>{t('Signed in as','تم تسجيل الدخول باسم')} <strong dir="ltr">{authUser.email}</strong></p>
+     <p>{t('Your favorites are saved privately to your account. Your shopping bag remains on this device.','تُحفظ مفضلتك لحسابك فقط. تبقى حقيبة التسوق على هذا الجهاز.')}</p>
+     <p>{favorites.length} {t('saved favorites','قطع في المفضلة')}{favoriteLoading?` · ${t('Loading…','جارٍ التحميل…')}`:''}</p>
+     {favoriteLoadError&&<p className="auth-error" role="alert">{t('Could not load your saved favorites. Try again from the Favorites page.','تعذر تحميل مفضلتك. حاولي مجدداً من صفحة المفضلة.')}</p>}
+     <button className="text-link" onClick={()=>go('favorites')}>{t('View your favorites','عرض المفضلة')}<ArrowRight/></button>
+     <button className="text-link" onClick={()=>go('orders')}>{t('My orders','طلباتي')}<PackageCheck/></button>
+     {authError&&<p className="auth-error" role="alert">{authError}</p>}
+     {authNotice&&<p className="auth-notice" role="status">{authNotice}</p>}
+     <button className="btn" onClick={()=>void signOut()} disabled={authBusy} aria-busy={authBusy}>{authBusy?t('Signing out…','جارٍ تسجيل الخروج…'):t('Sign out','تسجيل الخروج')}</button>
+    </>:!authReady?<p role="status">{t('Checking your account…','جارٍ التحقق من حسابك…')}</p>
+    :<>
+     {!recoveryMode&&<p>{auth==='forgot'?t('We will email you a secure password-reset link.','سنرسل رابطاً آمناً لإعادة تعيين كلمة المرور إلى بريدك.'):t('Sign in or create an account to save your favorites across devices. Passwords are handled securely by Supabase Auth.','سجّلي الدخول أو أنشئي حساباً لحفظ مفضلتك بين أجهزتك. تتولى Supabase Auth حماية كلمات المرور.')}</p>}
+     {!recoveryMode&&auth!=='forgot'&&<div className="tabs" role="tablist" aria-label={t('Account access','الدخول إلى الحساب')}>
+      <button type="button" role="tab" aria-selected={auth==='login'} className={auth==='login'?'selected':''} onClick={()=>{setAuth('login');setAuthError('');setAuthNotice('');setAccountPassword('')}}>{t('Log in','تسجيل الدخول')}</button>
+      <button type="button" role="tab" aria-selected={auth==='signup'} className={auth==='signup'?'selected':''} onClick={()=>{setAuth('signup');setAuthError('');setAuthNotice('');setAccountPassword('');setAccountName('')}}>{t('Sign up','إنشاء حساب')}</button>
+     </div>}
+     <form key={`${auth}-${recoveryMode}`} onSubmit={submitAccount}>
+      {recoveryMode?<>
+       <label>{t('New password','كلمة المرور الجديدة')}
+        <input data-testid="input-new-password" required minLength={8} autoComplete="new-password" type={showRecoveryPasswords?'text':'password'} value={accountPassword} onChange={event=>{setAccountPassword(event.target.value);setAuthError('')}} placeholder={t('At least 8 characters','٨ أحرف على الأقل')}/>
+       </label>
+       <label>{t('Confirm new password','تأكيد كلمة المرور الجديدة')}
+        <input data-testid="input-confirm-new-password" required minLength={8} autoComplete="new-password" type={showRecoveryPasswords?'text':'password'} value={recoveryConfirmPassword} onChange={event=>{setRecoveryConfirmPassword(event.target.value);setAuthError('')}} placeholder={t('Enter the new password again','أدخلي كلمة المرور الجديدة مرة أخرى')}/>
+       </label>
+       <button data-testid="button-toggle-recovery-passwords" type="button" className="text-link" aria-pressed={showRecoveryPasswords} onClick={()=>setShowRecoveryPasswords(value=>!value)}>{showRecoveryPasswords?t('Hide passwords','إخفاء كلمات المرور'):t('Show passwords','إظهار كلمات المرور')}</button>
+       {accountPassword.length>0&&accountPassword.length<8&&<p className="auth-error" role="alert">{t('Use at least 8 characters.','استخدمي ٨ أحرف على الأقل.')}</p>}
+       {recoveryConfirmPassword.length>0&&accountPassword!==recoveryConfirmPassword&&<p className="auth-error" role="alert">{t('The passwords do not match.','كلمتا المرور غير متطابقتين.')}</p>}
+      </>:<>
+       {auth==='signup'&&<label>{t('Your name','اسمك')}<input autoComplete="name" value={accountName} onChange={event=>setAccountName(event.target.value)} placeholder={t('Full name','الاسم الكامل')}/></label>}
+       <label>{t('Email address','البريد الإلكتروني')}<input required type="email" autoComplete="email" value={accountEmail} onChange={event=>setAccountEmail(event.target.value)} placeholder="you@example.com"/></label>
+       {auth!=='forgot'&&<label>{t('Password','كلمة المرور')}<input required minLength={8} type="password" autoComplete={auth==='signup'?'new-password':'current-password'} value={accountPassword} onChange={event=>setAccountPassword(event.target.value)} placeholder={t('At least 8 characters','٨ أحرف على الأقل')}/></label>}
+      </>}
+      <button className="btn" type="submit" disabled={authBusy||!authReady||(recoveryMode&&(!authSession?.access_token||accountPassword.length<8||accountPassword!==recoveryConfirmPassword))} aria-busy={authBusy}>{authBusy?t('Please wait…','يرجى الانتظار…'):recoveryMode?t('UPDATE PASSWORD','تحديث كلمة المرور'):auth==='signup'?t('CREATE ACCOUNT','إنشاء الحساب'):auth==='forgot'?t('SEND RESET LINK','إرسال رابط الاستعادة'):t('LOG IN','تسجيل الدخول')}<ArrowRight/></button>
+     </form>
+     {authError&&<p className="auth-error" role="alert">{authError}</p>}
+     {authNotice&&<p className="auth-notice" role="status" aria-live="polite">{authNotice}</p>}
+     {!recoveryMode&&<button type="button" className="text-link" onClick={()=>{setAuth(auth==='forgot'?'login':'forgot');setAuthError('');setAuthNotice('');setRecoveryLinkInvalid(false)}}>{auth==='forgot'?t('Back to log in','العودة لتسجيل الدخول'):t('Forgot your password?','نسيتِ كلمة المرور؟')}</button>}
+     {!authUser&&!recoveryMode&&!recoveryLinkInvalid&&<p className="auth-privacy">{t('Your password is sent only to Supabase Auth; F9 does not store it. Guest favorites stay on this device.','تُرسل كلمة المرور إلى Supabase Auth فقط، ولا يحفظها F9. تبقى مفضلة الزائرة على هذا الجهاز.')}</p>}
+    </>}
+    {authUser&&!recoveryMode&&!recoveryLinkInvalid&&<button className="text-link" style={{marginTop:18}} onClick={()=>go('orders')}>{t('My orders','طلباتي')}<PackageCheck/></button>}
+   </div>
+  </section>}
   {page==='orders'&&<section className="orders-page">
    <div className="page-intro"><span className="eyebrow">{t('YOUR PRIVATE ACCOUNT','حسابك الخاص')}</span><h1>{title('orders')}</h1><p>{t('A private record of orders placed with F9 boutiques.','سجل خاص بالطلبات التي تمت لدى بوتيكات F9.')}</p></div>
    {!authReady||ordersLoading||(!ordersLoaded&&!ordersError)
