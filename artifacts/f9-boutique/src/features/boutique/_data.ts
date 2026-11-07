@@ -1,18 +1,8 @@
-export type Product = {id:number;name:string;ar:string;brand:number;price:number;image:string;category:'abayas'|'women';sizes:string[];colors:[string,string,string][];description:string;descriptionAr:string;fresh?:boolean;best?:boolean};
-export const boutiques=[
- {id:1,name:'NOOR ATELIER',ar:'نور أتيليه',mark:'N',line:'The art of understated abayas.',lineAr:'فن العبايات الراقية بتفاصيل هادئة.',story:'Designed in Kuwait. Fluid silhouettes, quiet details and fabrics chosen to move with you.',storyAr:'تصاميم كويتية بقصّات انسيابية وتفاصيل هادئة وأقمشة ترافق كل خطوة.'},
- {id:2,name:'MAISON DUNE',ar:'ميزون ديون',mark:'md',line:'A softer way to make an entrance.',lineAr:'حضور استثنائي بلمسات ناعمة.',story:'Considered occasionwear in a palette borrowed from the desert. For your most memorable evenings.',storyAr:'أزياء مناسبات مدروسة بألوان مستوحاة من الصحراء، لأمسياتك التي لا تُنسى.'},
- {id:3,name:'THE LINEN ROOM',ar:'ذا لينن روم',mark:'lr',line:'Everyday pieces. Exceptional feeling.',lineAr:'قطع يومية بإحساس استثنائي.',story:'Natural textures and relaxed tailoring for unhurried days. Made for the rhythm of Kuwait.',storyAr:'خامات طبيعية وقصّات مريحة لأيام هادئة. مصممة لإيقاع الحياة في الكويت.'}
-];
-export const products:Product[]=[
- {id:1,name:'The Signature Abaya',ar:'عباية التوقيع',brand:1,price:68.5,image:'noor',category:'abayas',sizes:['S','M','L','XL'],colors:[['Onyx','أسود','#2e2926'],['Sand','رملي','#c9b79e']],description:'A study in quiet elegance. A fluid, open-front abaya in premium crepe, finished with delicate champagne piping. Includes a coordinating sheila.',descriptionAr:'أناقة هادئة في عباية مفتوحة من الكريب الفاخر، بلمسات شامبين دقيقة. تشمل شيلة متناسقة.',fresh:true,best:true},
- {id:2,name:'Champagne Silk Abaya',ar:'عباية حرير شامبين',brand:1,price:89,image:'silk',category:'abayas',sizes:['S','M','L'],colors:[['Champagne','شامبين','#c8b69f'],['Pearl','لؤلؤي','#e6dfd2']],description:'Luminous silk, generous sleeves and tonal embroidery. An exquisite drape that catches the afternoon light. Includes a matching sheila.',descriptionAr:'حرير مضيء وأكمام واسعة وتطريز متناغم. انسيابية راقية تتألق تحت ضوء العصر. تشمل شيلة مطابقة.',fresh:true},
- {id:3,name:'The Ivory Pleated Dress',ar:'فستان العاج بثنيات',brand:2,price:76.75,image:'dress',category:'women',sizes:['XS','S','M','L'],colors:[['Ivory','عاجي','#eae2d2'],['Oat','شوفان','#b5a58c']],description:'An architectural waist meets soft, sweeping pleats. This fully lined, long-sleeve maxi dress is made for intimate celebrations.',descriptionAr:'خصر منحوت وثنيات ناعمة في فستان ماكسي بأكمام طويلة وبطانة كاملة. مثالي لمناسباتك الحميمة.',best:true},
- {id:4,name:'Olive Silk Co-ord',ar:'طقم الحرير الزيتوني',brand:3,price:54.25,image:'olive',category:'women',sizes:['S','M','L','XL'],colors:[['Olive','زيتوني','#7a7c60'],['Stone','حجري','#b1a696']],description:'An effortless pairing of a longline silk tunic and wide-leg trousers. Beautiful together, equally considered apart. Two-piece set.',descriptionAr:'طقم أنيق من تونيك حريري طويل وبنطال واسع. جمال متكامل وقطع مستقلة متعددة الإطلالات.',fresh:true,best:true},
- {id:5,name:'Rosewater Occasion Dress',ar:'فستان ورد للمناسبات',brand:2,price:112.5,image:'rose',category:'women',sizes:['XS','S','M','L'],colors:[['Rosewater','وردي','#bb9490'],['Clay','طيني','#a98472']],description:'A graceful occasion dress with sculptural sleeves and a sweeping hem. Soft rose fabric with a subtle lustre, fully lined.',descriptionAr:'فستان مناسبات راقٍ بأكمام منحوتة وحافة انسيابية. قماش وردي بلمعة خفيفة وبطانة كاملة.',fresh:true},
- {id:6,name:'The Sculpted Cape Abaya',ar:'عباية الكاب المنحوت',brand:1,price:94.75,image:'black',category:'abayas',sizes:['S','M','L','XL'],colors:[['Espresso','إسبريسو','#49392f'],['Onyx','أسود','#292523']],description:'A striking cape silhouette with delicate pleats and a beautifully weighted drape. Closed-front design in premium woven crepe.',descriptionAr:'قصّة كاب لافتة بثنيات دقيقة وانسيابية متوازنة. تصميم مغلق من الكريب المنسوج الفاخر.',best:true}
-];
-export const image=(name:string)=>`${import.meta.env.BASE_URL}images/f9-${name}.jpg`;
-export type BagItem={id:number;size:string;color:string;qty:number};
-export type Filters={category:string;brand:string;size:string;min:string;max:string};
-export const blankFilters:Filters={category:'',brand:'',size:'',min:'',max:''};
+import type { CatalogProduct } from '@workspace/api-client-react';
+
+// Catalog records come from Supabase via /api/catalog, never a local fallback.
+export type Product = CatalogProduct;
+export const image = (name: string) => `${import.meta.env.BASE_URL}images/f9-${name}.jpg`;
+export type BagItem = { id: number; size: string; color: string; qty: number };
+export type Filters = { category: string; brand: string; size: string; min: string; max: string };
+export const blankFilters: Filters = { category: '', brand: '', size: '', min: '', max: '' };

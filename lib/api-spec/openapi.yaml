@@ -11,6 +11,17 @@ tags:
   - name: health
     description: Health operations
 paths:
+  /catalog:
+    get:
+      operationId: getCatalog
+      summary: Read the F9 catalog from Supabase
+      responses:
+        "200":
+          description: Current products and boutiques
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Catalog"
   /exchange-rates:
     get:
       operationId: getExchangeRates
@@ -54,6 +65,55 @@ paths:
                 $ref: "#/components/schemas/HealthStatus"
 components:
   schemas:
+    Catalog:
+      type: object
+      required: [products, boutiques]
+      properties:
+        products:
+          type: array
+          items: { $ref: "#/components/schemas/CatalogProduct" }
+        boutiques:
+          type: array
+          items: { $ref: "#/components/schemas/CatalogBoutique" }
+    CatalogBoutique:
+      type: object
+      required: [id, name, ar, mark, line, lineAr, story, storyAr]
+      properties:
+        id: { type: integer, minimum: 1 }
+        name: { type: string, minLength: 1 }
+        ar: { type: string, minLength: 1 }
+        mark: { type: string }
+        line: { type: string }
+        lineAr: { type: string }
+        story: { type: string }
+        storyAr: { type: string }
+    CatalogProduct:
+      type: object
+      required: [id, name, ar, brand, price, image, category, sizes, colors, description, descriptionAr, fresh, best]
+      properties:
+        id: { type: integer, minimum: 1 }
+        name: { type: string, minLength: 1 }
+        ar: { type: string, minLength: 1 }
+        brand: { type: integer, minimum: 1 }
+        price: { type: number, minimum: 0 }
+        image: { type: string, pattern: "^[a-z0-9-]+$" }
+        category: { type: string, enum: [abayas, women] }
+        sizes:
+          type: array
+          minItems: 1
+          items: { type: string, minLength: 1 }
+        colors:
+          type: array
+          minItems: 1
+          items:
+            type: array
+            minItems: 3
+            maxItems: 3
+            items: { type: string }
+        description: { type: string }
+        descriptionAr: { type: string }
+        fresh: { type: boolean }
+        best: { type: boolean }
     ExchangeRates:
       type: object
       required: [base, rates, updatedAt, nextUpdateAt, fetchedAt, provider]

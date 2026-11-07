@@ -9,6 +9,56 @@ import * as zod from 'zod';
 
 
 /**
+ * @summary Read the F9 catalog from Supabase
+ */
+
+
+
+
+export const getCatalogResponseProductsItemPriceMin = 0;
+
+export const getCatalogResponseProductsItemImageRegExp = new RegExp('^[a-z0-9-]+$');
+
+
+export const getCatalogResponseProductsItemColorsItemMin = 3;
+export const getCatalogResponseProductsItemColorsItemMax = 3;
+
+
+
+
+
+
+
+export const GetCatalogResponse = zod.object({
+  "products": zod.array(zod.object({
+  "id": zod.number().int().min(1),
+  "name": zod.string().min(1),
+  "ar": zod.string().min(1),
+  "brand": zod.number().int().min(1),
+  "price": zod.number().min(getCatalogResponseProductsItemPriceMin),
+  "image": zod.string().regex(getCatalogResponseProductsItemImageRegExp),
+  "category": zod.enum(['abayas', 'women']),
+  "sizes": zod.array(zod.string().min(1)).min(1),
+  "colors": zod.array(zod.array(zod.string()).min(getCatalogResponseProductsItemColorsItemMin).max(getCatalogResponseProductsItemColorsItemMax)).min(1),
+  "description": zod.string(),
+  "descriptionAr": zod.string(),
+  "fresh": zod.boolean(),
+  "best": zod.boolean()
+})),
+  "boutiques": zod.array(zod.object({
+  "id": zod.number().int().min(1),
+  "name": zod.string().min(1),
+  "ar": zod.string().min(1),
+  "mark": zod.string(),
+  "line": zod.string(),
+  "lineAr": zod.string(),
+  "story": zod.string(),
+  "storyAr": zod.string()
+}))
+})
+
+
+/**
  * @summary Latest available KWD exchange rates
  */
 export const GetExchangeRatesResponse = zod.object({

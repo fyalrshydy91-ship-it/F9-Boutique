@@ -6,6 +6,10 @@
  * OpenAPI spec version: 0.1.0
  */
 
+export * from './catalog';
+export * from './catalogBoutique';
+export * from './catalogProduct';
+export * from './catalogProductCategory';
 export * from './exchangeRates';
 export * from './exchangeRatesRates';
 export * from './healthStatus';

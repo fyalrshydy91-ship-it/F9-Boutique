@@ -1,4 +1,4 @@
-import { Boutique } from './features/boutique/Boutique';
+import { CatalogBoutique } from './features/boutique/CatalogBoutique';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 
 const queryClient = new QueryClient({
@@ -9,7 +9,7 @@ const queryClient = new QueryClient({
 });
 
 function App() {
-  return <QueryClientProvider client={queryClient}><Boutique /></QueryClientProvider>;
+  return <QueryClientProvider client={queryClient}><CatalogBoutique /></QueryClientProvider>;
 }
 
 export default App;

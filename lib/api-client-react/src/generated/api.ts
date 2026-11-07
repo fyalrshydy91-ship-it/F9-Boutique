@@ -20,6 +20,7 @@ import type {
 } from '@tanstack/react-query';
 
 import type {
+  Catalog,
   ExchangeRates,
   HealthStatus,
   StylistInput,
@@ -52,6 +53,83 @@ const withQueryKey = <T extends object, K>(query: T, queryKey: K): T & { queryKe
   }
   return result;
 };
+
+export const getGetCatalogUrl = () => {
+
+
+
+
+  return `/api/catalog`
+}
+
+/**
+ * @summary Read the F9 catalog from Supabase
+ */
+export const getCatalog = async ( options?: Parameters<typeof customFetch>[1]): Promise<Catalog> => {
+
+  return customFetch<Catalog>(getGetCatalogUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetCatalogQueryKey = () => {
+    return [
+    `/api/catalog`
+    ] as const;
+    }
+
+
+export const getGetCatalogQueryOptions = <TData = Awaited<ReturnType<typeof getCatalog>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getCatalog>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetCatalogQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getCatalog>>> = ({ signal }) => getCatalog({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getCatalog>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetCatalogQueryResult = NonNullable<Awaited<ReturnType<typeof getCatalog>>>
+export type GetCatalogQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary Read the F9 catalog from Supabase
+ */
+
+export function useGetCatalog<TData = Awaited<ReturnType<typeof getCatalog>>, TError = ErrorType<unknown>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getCatalog>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetCatalogQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
 
 export const getGetExchangeRatesUrl = () => {
 

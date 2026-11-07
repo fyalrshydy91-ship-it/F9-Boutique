@@ -26,3 +26,9 @@ The user expanded the scope for Day 3 to include real public currency rates and 
 **Why:** The user explicitly requested the class API and AI requirements in the existing project, not a rebuild.
 
 **How to apply:** Keep external service calls server-side. Use the user's own OpenRouter key in Replit Secrets for this class requirement rather than substituting Replit-billed AI access.
+
+The user chose Supabase for products and boutiques, not user accounts or saved items. Preserve the approved catalog and product IDs when moving the catalog source; cart and favorites remain browser-local unless separately requested.
+
+**Why:** The user selected “Products and boutiques” when asked which part of F9 Supabase should power.
+
+**How to apply:** Keep catalog access publicly readable but not publicly writable. Do not treat the Supabase connection as permission to implement customer authentication, checkout, or an administrative editor.

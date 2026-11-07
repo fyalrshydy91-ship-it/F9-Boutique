@@ -1,2 +1,2 @@
-- [F9 Boutique scope](f9-boutique-scope.md) — multi-boutique womenswear platform, luxury model imagery, and bilingual frontend-only prototype boundaries.
+- [F9 Boutique scope](f9-boutique-scope.md) — multi-boutique womenswear, approved design, live API/AI and Supabase catalog exceptions to demo-only commerce.
 - [Browser pending checks](browser-pending-tests.md) — hold mocked responses with a deferred barrier; fixed delays across browser actions can falsely suggest broken guards.

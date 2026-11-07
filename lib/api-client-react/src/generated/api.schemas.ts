@@ -5,6 +5,64 @@
  * API specification
  * OpenAPI spec version: 0.1.0
  */
+export type CatalogProductCategory = typeof CatalogProductCategory[keyof typeof CatalogProductCategory];
+
+
+export const CatalogProductCategory = {
+  abayas: 'abayas',
+  women: 'women',
+} as const;
+
+export interface CatalogProduct {
+  /** @minimum 1 */
+  id: number;
+  /** @minLength 1 */
+  name: string;
+  /** @minLength 1 */
+  ar: string;
+  /** @minimum 1 */
+  brand: number;
+  /** @minimum 0 */
+  price: number;
+  /** @pattern ^[a-z0-9-]+$ */
+  image: string;
+  category: CatalogProductCategory;
+  /**
+     * @minItems 1
+     * @items.minLength 1
+     */
+  sizes: string[];
+  /**
+     * @minItems 1
+     * @items.minItems 3
+     * @items.maxItems 3
+     */
+  colors: string[][];
+  description: string;
+  descriptionAr: string;
+  fresh: boolean;
+  best: boolean;
+}
+
+export interface CatalogBoutique {
+  /** @minimum 1 */
+  id: number;
+  /** @minLength 1 */
+  name: string;
+  /** @minLength 1 */
+  ar: string;
+  mark: string;
+  line: string;
+  lineAr: string;
+  story: string;
+  storyAr: string;
+}
+
+export interface Catalog {
+  products: CatalogProduct[];
+  boutiques: CatalogBoutique[];
+}
+
 export type ExchangeRatesRates = {[key: string]: number};
 
 export interface ExchangeRates {
