@@ -9,4 +9,10 @@
 export interface StylistReply {
   reply: string;
   ratesIncluded: boolean;
+  /**
+     * @minItems 0
+     * @maxItems 3
+     * @items.minimum 1
+     */
+  recommendedProductIds: number[];
 }

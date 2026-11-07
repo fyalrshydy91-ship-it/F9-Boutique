@@ -88,9 +88,16 @@ export const AskStylistBody = zod.object({
   "language": zod.enum(['en', 'ar']).default(askStylistBodyLanguageDefault)
 })
 
+
+export const askStylistResponseRecommendedProductIdsMin = 0;
+export const askStylistResponseRecommendedProductIdsMax = 3;
+
+
+
 export const AskStylistResponse = zod.object({
   "reply": zod.string(),
-  "ratesIncluded": zod.boolean()
+  "ratesIncluded": zod.boolean(),
+  "recommendedProductIds": zod.array(zod.number().int().min(1)).min(askStylistResponseRecommendedProductIdsMin).max(askStylistResponseRecommendedProductIdsMax)
 })
 
 

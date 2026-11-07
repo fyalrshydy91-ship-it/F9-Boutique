@@ -1,11 +1,12 @@
 import { useRef, useState } from 'react';
 import { ArrowDownUp, ArrowLeft, ArrowRight, RefreshCw, Send, Sparkles } from 'lucide-react';
 import { getGetExchangeRatesQueryKey, useAskStylist, useGetExchangeRates } from '@workspace/api-client-react';
-import type { StylistMessage } from '@workspace/api-client-react';
+import type { CatalogBoutique, StylistMessage } from '@workspace/api-client-react';
+import { image, type Product } from './_data';
 import './_companion.css';
 
 type Language = 'en' | 'ar';
-type ChatMessage = StylistMessage;
+type ChatMessage = StylistMessage & { recommendations?: Product[] };
 
 const copy = {
   en: {
@@ -29,7 +30,8 @@ const copy = {
     enter: 'Write a question first.', rateUnknown: 'This currency is not available in the latest rate table.',
     conversion: 'Estimated amount', reference: 'Reference rates', latest: 'Latest rates · 1 KWD', noRate: 'No rate data is available.',
     amountInvalid: 'Enter a valid amount from 0 to 1,000,000,000,000.',
-    back: 'Back to F9', sourceLink: 'ExchangeRate-API',
+    back: 'Back to F9', sourceLink: 'ExchangeRate-API', viewProduct: 'View this piece',
+    recommendations: 'Selected for you',
   },
   ar: {
     eyebrow: 'تجربة تسوّق أقرب إليك', title: 'رفيقتك في التسوّق',
@@ -52,7 +54,8 @@ const copy = {
     enter: 'اكتبي سؤالك أولاً.', rateUnknown: 'هذه العملة غير متاحة في أحدث جدول للأسعار.',
     conversion: 'المبلغ التقديري', reference: 'الأسعار المرجعية', latest: 'أحدث الأسعار · ١ د.ك', noRate: 'لا تتوفر بيانات للأسعار.',
     amountInvalid: 'أدخلي مبلغاً صحيحاً من ٠ إلى ١٬٠٠٠٬٠٠٠٬٠٠٠٬٠٠٠.',
-    back: 'العودة إلى F9', sourceLink: 'إكستشينج ريت API',
+    back: 'العودة إلى F9', sourceLink: 'إكستشينج ريت API', viewProduct: 'عرض هذه القطعة',
+    recommendations: 'مختارة لكِ',
   },
 } as const;
 
@@ -78,7 +81,15 @@ function friendlyError(error: unknown, language: Language) {
   return text.errorGeneric;
 }
 
-export function ShoppingCompanion({ language, onBack }: { language: Language; onBack: () => void }) {
+export function ShoppingCompanion({
+  language, onBack, products, boutiques, onProductClick,
+}: {
+  language: Language;
+  onBack: () => void;
+  products: Product[];
+  boutiques: CatalogBoutique[];
+  onProductClick: (product: Product) => void;
+}) {
   const ar = language === 'ar';
   const text = copy[language];
   const ratesQuery = useGetExchangeRates({ query: { enabled: true, queryKey: getGetExchangeRatesQueryKey(), refetchOnMount: 'always' } });
@@ -121,7 +132,10 @@ export function ShoppingCompanion({ language, onBack }: { language: Language; on
     setChatError('');
     setFailedQuestion(question);
 
-    const requestMessages: ChatMessage[] = [...messages, { role: 'user' as const, content: question }]
+    const requestMessages: StylistMessage[] = [
+      ...messages.map(message => ({ role: message.role as StylistMessage['role'], content: message.content })),
+      { role: 'user' as const, content: question },
+    ]
       .map(message => ({ ...message, content: message.content.slice(0, 2000) }));
     while (requestMessages.length > 12 ||
       requestMessages.reduce((total, message) => total + message.content.length, 0) > 12000) {
@@ -130,7 +144,14 @@ export function ShoppingCompanion({ language, onBack }: { language: Language; on
     }
     try {
       const result = await stylist.mutateAsync({ data: { messages: requestMessages, language } });
-      const next = [...requestMessages, { role: 'assistant' as const, content: result.reply }];
+      const recommendations = [...new Set(result.recommendedProductIds)]
+        .slice(0, 3)
+        .map(id => products.find(product => product.id === id))
+        .filter((product): product is Product => !!product);
+      const next: ChatMessage[] = [
+        ...requestMessages,
+        { role: 'assistant', content: result.reply, recommendations },
+      ];
       const trimmed = next.slice(-12);
       setMessages(trimmed);
       setFailedQuestion(null);
@@ -187,7 +208,16 @@ export function ShoppingCompanion({ language, onBack }: { language: Language; on
         <p className="companion-intro">{text.stylistIntro}</p>
         <div className="stylist-thread" aria-live="polite" aria-relevant="additions text">
           {messages.length === 0 && failedQuestion === null && <div className="stylist-welcome"><Sparkles/><p>{ar?'لنبدأ من المناسبة أو الأسلوب الذي تحبينه.':'Begin with an occasion, a silhouette or a feeling you have in mind.'}</p></div>}
-          {messages.map((message,index)=><div className={`stylist-message ${message.role}`} key={`${message.role}-${index}`}><span>{message.role==='user'?(ar?'أنتِ':'You'):'F9 Stylist'}</span><p>{message.content}</p></div>)}
+          {messages.map((message,index)=><div className={`stylist-message ${message.role}`} key={`${message.role}-${index}`}><span>{message.role==='user'?(ar?'أنتِ':'You'):'F9 Stylist'}</span><p>{message.content}</p>
+            {message.role==='assistant'&&message.recommendations&&message.recommendations.length>0&&<div className="stylist-recommendations" aria-label={text.recommendations}><span>{text.recommendations}</span>{message.recommendations.map(product=>{
+              const boutique=boutiques.find(item=>item.id===product.brand);
+              if(!boutique)return null;
+              return <button className="stylist-product-card" data-testid={`button-stylist-product-${product.id}`} type="button" key={product.id} onClick={()=>onProductClick(product)}>
+                <img src={image(product.image)} alt={ar?product.ar:product.name} loading="lazy"/>
+                <span className="stylist-product-details"><span className="stylist-product-boutique">{ar?boutique.ar:boutique.name}</span><strong>{ar?product.ar:product.name}</strong><span className="stylist-product-price">{product.price.toFixed(3)} {ar?'د.ك':'KWD'}</span><span className="stylist-product-link">{text.viewProduct}<ArrowRight aria-hidden="true"/></span></span>
+              </button>;
+            })}</div>}
+          </div>)}
           {failedQuestion !== null && !messages.some((message,index)=>message.role==='user' && index===messages.length-1 && message.content===failedQuestion) && <div className="stylist-message user"><span>{ar?'أنتِ':'You'}</span><p>{failedQuestion}</p></div>}
           {stylist.isPending && <div className="stylist-pending" role="status"><span className="companion-skeleton"/>{text.sending}</div>}
           {chatError && <div className="stylist-error" role="alert"><p>{chatError}</p><button onClick={() => void send()} disabled={stylist.isPending}>{text.retry}</button></div>}

@@ -37,6 +37,10 @@
 .f9 .companion-entry { display:inline-flex; align-items:center; gap:7px; padding:6px 0; color:#756657; border-bottom:1px solid transparent; font-size:10px; letter-spacing:1px; white-space:nowrap; }
 .f9 .companion-entry:hover { border-color:#9d8060; }
 .f9 .companion-entry svg { width:15px; height:15px; }
+.f9 .stylist-float { position:fixed; z-index:45; right:max(18px,env(safe-area-inset-right)); bottom:max(20px,env(safe-area-inset-bottom)); display:inline-flex; align-items:center; gap:10px; padding:13px 17px; border:1px solid #bca58d; background:var(--ink); color:var(--ivory); box-shadow:0 8px 24px #29231f35; font-size:11px; letter-spacing:.45px; cursor:pointer; }
+.f9 .stylist-float:hover { background:#453a32; }
+.f9 .stylist-float:focus-visible { outline:2px solid #bca58d; outline-offset:3px; }
+.f9 .stylist-float svg { width:18px; height:18px; flex:none; }
 
 /* A quiet masthead, a generous cinematic opening. */
 .f9 .announcement { text-align: center; background: var(--ink); color: var(--champagne); font-size: 9px; letter-spacing: 2.1px; padding: 9px 15px; }
@@ -154,6 +158,20 @@
 .f9 .detail-info { padding: 25px 0; }
 .f9 .detail-info h1 { font-size: 43px; margin: 14px 0 17px; }
 .f9 .detail-info .price { font-size: 19px; }
+.f9 .detail-price-label { margin: 0 0 3px; color:#80766c; font-size:10px; letter-spacing:.7px; text-transform:uppercase; }
+.f9 .detail-currency { margin:15px 0 20px; padding:14px 0; border-top:1px solid var(--line); border-bottom:1px solid var(--line); }
+.f9 .detail-currency-heading { display:flex; flex-direction:column; gap:4px; margin-bottom:11px; }
+.f9 .detail-currency-heading>span { font-size:11px; letter-spacing:.7px; text-transform:uppercase; }
+.f9 .detail-currency-heading small,.f9 .detail-currency-updated { color:#80766c; font-size:10px; line-height:1.6; }
+.f9 .detail-currency-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:8px 16px; }
+.f9 .detail-currency-grid>div { display:flex; justify-content:space-between; align-items:baseline; gap:8px; min-width:0; padding:5px 0; }
+.f9 .detail-currency-grid>div>span { color:#80766c; font-size:10px; letter-spacing:.5px; }
+.f9 .detail-currency-grid strong { overflow-wrap:anywhere; font-size:12px; font-weight:500; }
+.f9 .detail-info .detail-currency-note { margin:8px 0 4px; color:#80766c; font-size:10px; line-height:1.6; }
+.f9 .detail-currency-status { display:flex; align-items:center; justify-content:space-between; gap:10px; color:#80766c; font-size:11px; line-height:1.7; }
+.f9 .detail-info .detail-currency-status { margin:8px 0 0; }
+.f9 .detail-currency-status button { flex:none; padding:5px 0; border:0; background:transparent; color:var(--ink); font-size:10px; text-decoration:underline; text-underline-offset:3px; cursor:pointer; }
+.f9 .detail-currency-status button:disabled { opacity:.55; cursor:wait; }
 .f9 .detail-info p { color: #80766c; font-size: 12px; line-height: 2; margin: 24px 0; }
 .f9 .choice-label { font-size: 10px; letter-spacing: 1px; display: block; margin: 26px 0 12px; }
 .f9 .choices { display: flex; gap: 9px; flex-wrap: wrap; }
@@ -247,6 +265,8 @@
   .f9 .mast-side.end { gap: 8px; }
   .f9 .companion-entry { gap:4px; font-size:8px; letter-spacing:.3px; }
   .f9 .companion-entry svg { width:15px; height:15px; }
+  .f9 .stylist-float { right:max(13px,env(safe-area-inset-right)); bottom:max(14px,env(safe-area-inset-bottom)); gap:8px; padding:11px 13px; font-size:10px; }
+  .f9 .stylist-float svg { width:16px; height:16px; }
   .f9 .mast-side .account-icon { display: none; }
   .f9 .icon-btn { padding: 3px; }
   .f9 .icon-btn svg { width: 18px; height: 18px; }

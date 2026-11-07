@@ -30,15 +30,19 @@ async function readTable(table: "products" | "boutiques"): Promise<unknown[]> {
 }
 
 const router: IRouter = Router();
+export async function readCatalog() {
+  const [products, boutiques] = await Promise.all([readTable("products"), readTable("boutiques")]);
+  const result = GetCatalogResponse.safeParse({ products, boutiques });
+  if (!result.success || result.data.products.some(product => !result.data.boutiques.some(b => b.id === product.brand))) {
+    throw new CatalogError(502, "Some catalog information is incomplete. Please try again or contact the site owner.");
+  }
+  return result.data;
+}
+
 router.get("/catalog", async (_req, res) => {
   res.setHeader("Cache-Control", "no-store");
   try {
-    const [products, boutiques] = await Promise.all([readTable("products"), readTable("boutiques")]);
-    const result = GetCatalogResponse.safeParse({ products, boutiques });
-    if (!result.success || result.data.products.some(product => !result.data.boutiques.some(b => b.id === product.brand))) {
-      throw new CatalogError(502, "Some catalog information is incomplete. Please try again or contact the site owner.");
-    }
-    res.json(result.data);
+    res.json(await readCatalog());
   } catch (error) {
     const problem = error instanceof CatalogError ? error : new CatalogError(500, "The catalog could not be loaded. Please try again.");
     if (problem.status === 429) res.setHeader("Retry-After", "60");

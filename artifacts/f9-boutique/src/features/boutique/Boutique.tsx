@@ -1,7 +1,8 @@
 import {useEffect,useRef,useState,type Dispatch,type FormEvent,type SetStateAction} from 'react';
 import type {Catalog} from '@workspace/api-client-react';
 import type {Session as AuthSession,User as AuthUser} from '@supabase/supabase-js';
-import {ArrowRight,ArrowUpRight,Check,ChevronRight,Heart,Menu,Minus,Plus,Search,ShoppingBag,SlidersHorizontal,Sparkles,User,X,Scale,MapPin,PackageCheck} from 'lucide-react';
+import {ArrowRight,ArrowUpRight,Check,ChevronRight,Heart,Menu,Minus,Plus,Search,ShoppingBag,SlidersHorizontal,Sparkles,User,X,Scale,MapPin,PackageCheck,MessageCircle} from 'lucide-react';
+import {getGetExchangeRatesQueryKey,useGetExchangeRates} from '@workspace/api-client-react';
 import {image,blankFilters,type Product,type BagItem,type Filters} from './_data';
 import {useStore} from './_use-store';
 import {ProductGallery} from './_Gallery';
@@ -13,11 +14,13 @@ import './_responsive.css';
 type Page='home'|'abayas'|'women'|'new'|'boutiques'|'collection'|'product'|'favorites'|'bag'|'account'|'orders'|'search'|'compare'|'about'|'contact'|'privacy'|'terms'|'instagram'|'companion';
 // Password recovery must leave private Replit previews and return to the public storefront.
 const PASSWORD_RESET_REDIRECT_URL='https://luxury-model-designs.replit.app';
+const APPROXIMATE_CURRENCIES=['USD','EUR','GBP','SAR'] as const;
 export function Boutique({products,boutiques,lang,setLang}:Catalog & {lang:'en'|'ar';setLang:Dispatch<SetStateAction<'en'|'ar'>>}){
  const [guestFavorites,setGuestFavorites]=useStore<number[]>('f9-favorites',[]);
  const [favorites,setFavorites]=useState<number[]>([]);
  const [bag,setBag]=useStore<BagItem[]>('f9-bag',[]);
  const [page,setPage]=useState<Page>('home');
+  const productRatesQuery=useGetExchangeRates({query:{enabled:page==='product',queryKey:getGetExchangeRatesQueryKey(),staleTime:0,refetchOnMount:'always',refetchOnWindowFocus:true}});
  const [selected,setSelected]=useState(1);
  const [brand,setBrand]=useState(1);
  const [size,setSize]=useState('');
@@ -71,6 +74,15 @@ export function Boutique({products,boutiques,lang,setLang}:Catalog & {lang:'en'|
   return t('We could not complete that account request. Check your details and try again.','تعذر إكمال طلب الحساب. تحققي من البيانات ثم حاولي مجدداً.');
  };
  const money=(n:number)=>`${n.toFixed(3)} ${t('KWD','د.ك')}`;
+  const approximatePrice=(currency:typeof APPROXIMATE_CURRENCIES[number])=>{
+   const rate=productRatesQuery.data?.rates[currency];
+   if(typeof rate!=='number'||!Number.isFinite(rate)||rate<=0)return null;
+   return new Intl.NumberFormat(ar?'ar-KW':'en-KW',{style:'currency',currency,maximumFractionDigits:2}).format(product.price*rate);
+  };
+  const formatRateDate=(value:string)=>{
+   const date=new Date(value);
+   return Number.isNaN(date.getTime())?value:new Intl.DateTimeFormat(ar?'ar-KW':'en-KW',{dateStyle:'medium'}).format(date);
+  };
  const product=products.find(p=>p.id===selected)||products[0];
  const currentBrand=boutiques.find(b=>b.id===brand)||boutiques[0];
  const boutiqueFor=(id:number)=>boutiques.find(b=>b.id===id)!;
@@ -268,7 +280,7 @@ export function Boutique({products,boutiques,lang,setLang}:Catalog & {lang:'en'|
   <div className="announcement">{t('ONE PLACE. ENDLESS STYLES.  —  A CURATED WORLD OF INDEPENDENT BOUTIQUES','مكان واحد. أناقة بلا حدود. — عالم منتقى من البوتيكات المستقلة')}</div>
     <header><div className="masthead"><div className="mast-side"><button className="icon-btn mobile-only" onClick={()=>setMenu(!menu)} aria-label={t('Open menu','فتح القائمة')} aria-expanded={menu}>{menu?<X/>:<Menu/>}</button><button className="icon-btn" onClick={()=>go('search')} aria-label={t('Search','بحث')}><Search/></button><span className="place">{t('CURATED IN KUWAIT','مختارات من الكويت')}</span></div><button onClick={()=>go('home')} aria-label={t('F9 Boutique home','الرئيسية')} style={{padding:0}}>{logo()}</button><div className="mast-side end"><button className="companion-entry" onClick={()=>go('companion')} aria-label={t('Open Shopping Companion','فتح رفيقتك في التسوق')} title={t('Shopping Companion','رفيقتك في التسوق')}><Sparkles/><span>{t('COMPANION','رفيقتك')}</span></button><button className="lang" onClick={()=>setLang(ar?'en':'ar')}>{ar?'EN':'العربية'}</button><button className="icon-btn account-icon" onClick={()=>go('account')} aria-label={t('Account','الحساب')}><User/></button><button className="icon-btn" onClick={()=>go('favorites')} aria-label={t('Favorites','المفضلة')}><Heart/>{favorites.length>0&&<small>{favorites.length}</small>}</button><button className="icon-btn" onClick={()=>go('bag')} aria-label={t('Shopping bag','حقيبة التسوق')}><ShoppingBag/><small>{count}</small></button></div></div><nav className="nav" aria-label={t('Main navigation','التنقل الرئيسي')} style={{gap:'clamp(34px, 5vw, 72px)'}}>{navItems.map(n=><button key={n} className={page===n?'active':''} onClick={()=>go(n)} style={{fontSize:'clamp(15px, 1.2vw, 17px)',letterSpacing:0,padding:'14px 0'}}>{n==='boutiques'?t('Boutiques','البوتيكات'):title(n)}</button>)}</nav>{menu&&<nav className="menu-panel">{navItems.map(n=><button key={n} onClick={()=>go(n)} style={{fontSize:17,padding:'12px 0'}}>{n==='boutiques'?t('Boutiques','البوتيكات'):title(n)}</button>)}<button style={{fontSize:17,padding:'12px 0'}} onClick={()=>go('companion')}>{t('Shopping Companion','رفيقتك في التسوق')}</button><button style={{fontSize:17,padding:'12px 0'}} onClick={()=>go('account')}>{t('Your account','حسابك')}</button></nav>}</header>
   <main>
-  {page==='companion'&&<ShoppingCompanion language={lang} onBack={()=>go('home')}/>}
+  {page==='companion'&&<ShoppingCompanion language={lang} products={products} boutiques={boutiques} onBack={()=>go('home')} onProductClick={openProduct}/>}
   {page==='home'&&<>
    <section className="hero"><img src={image('hero')} alt={t('A couture abaya in a sunlit stone villa','عباية فاخرة في فيلا حجرية مشمسة')} fetchPriority="high"/><div className="hero-content"><span className="eyebrow">{t('THE ART OF DRESSING, BEAUTIFULLY','فن الأناقة، بتفاصيل استثنائية')}</span><h1>{t('Discover','اكتشفي')}<br/><em>{t('Your Style.','أناقتك.')}</em></h1><p>{t('Explore elegant abayas and timeless fashion from different boutiques, all in one place.','اكتشفي عبايات أنيقة وأزياء خالدة من بوتيكات مختلفة، كلها في مكان واحد.')}</p><button className="btn light" onClick={()=>go('abayas')}>{t('SHOP NOW','تسوقي الآن')}<ArrowRight/></button></div><div className="hero-bottom"><span>{t('THE SUNLIT EDIT  /  VOL. 01','مجموعة ضوء الشمس / العدد ٠١')}</span><div className="slide-index">01<i/>03</div><span>{t('INDEPENDENT SPIRIT. EXCEPTIONAL STYLE.','روح مستقلة. أناقة استثنائية.')}</span></div></section>
    <div className="promise"><span><Sparkles/>{t('THOUGHTFULLY CURATED','منتقاة بعناية')}</span><span><MapPin/>{t('BOUTIQUES WORTH DISCOVERING','بوتيكات تستحق الاكتشاف')}</span><span><PackageCheck/>{t('A MORE PERSONAL WAY TO SHOP','تجربة تسوّق تشبهك')}</span></div>
@@ -290,7 +302,27 @@ export function Boutique({products,boutiques,lang,setLang}:Catalog & {lang:'en'|
    <div className="detail-grid">
     <ProductGallery key={product.id} product={product} ar={ar}/>
     <div className="detail-info">
-     <button className="boutique-name" onClick={()=>visitBrand(product.brand)}>{ar?boutiqueFor(product.brand).ar:boutiqueFor(product.brand).name}</button><h1>{ar?product.ar:product.name}</h1><div className="price">{money(product.price)}</div><p>{ar?product.descriptionAr:product.description}</p>
+      <button className="boutique-name" onClick={()=>visitBrand(product.brand)}>{ar?boutiqueFor(product.brand).ar:boutiqueFor(product.brand).name}</button><h1>{ar?product.ar:product.name}</h1><div className="detail-price-label">{t('Original price · KWD','السعر الأصلي · د.ك')}</div><div className="price">{money(product.price)}</div>
+      <section className="detail-currency" data-testid="panel-product-currency" aria-label={t('Approximate prices in other currencies','الأسعار التقريبية بعملات أخرى')}>
+       <div className="detail-currency-heading"><span>{t('Approximate prices','أسعار تقريبية')}</span><small>{t('Based on latest KWD reference rates','حسب أحدث أسعار الصرف المرجعية للدينار الكويتي')}</small></div>
+       {productRatesQuery.isLoading&&!productRatesQuery.data
+        ?<p className="detail-currency-status" role="status" data-testid="status-product-rates">{t('Loading approximate prices…','جارٍ تحميل الأسعار التقريبية…')}</p>
+        :!productRatesQuery.data
+         ?<div className="detail-currency-status" role="alert" data-testid="status-product-rates"><span>{t('Converted prices are unavailable. The KWD price is unchanged.','الأسعار المحولة غير متاحة. يبقى السعر بالدينار كما هو.')}</span><button type="button" data-testid="button-retry-product-rates" onClick={()=>void productRatesQuery.refetch()} disabled={productRatesQuery.isFetching}>{t('Retry','إعادة المحاولة')}</button></div>
+         :<>
+          <div className="detail-currency-grid">{APPROXIMATE_CURRENCIES.map(currency=>{
+           const value=approximatePrice(currency);
+           return value?<div key={currency} data-testid={`text-estimated-price-${currency}`}><span>{currency}</span><strong>{value}</strong></div>:null;
+          })}</div>
+          <p className="detail-currency-note">{t('Estimates only; the original KWD boutique price remains unchanged.','أسعار تقديرية فقط؛ يبقى سعر البوتيك الأصلي بالدينار الكويتي دون تغيير.')}</p>
+          {productRatesQuery.isError
+           ?<div className="detail-currency-status" role="status"><span>{t('Could not refresh rates; showing the last available estimates.','تعذر تحديث الأسعار؛ نعرض آخر تقديرات متاحة.')}</span><button type="button" data-testid="button-retry-product-rates" onClick={()=>void productRatesQuery.refetch()} disabled={productRatesQuery.isFetching}>{t('Retry','إعادة المحاولة')}</button></div>
+           :productRatesQuery.isFetching
+            ?<p className="detail-currency-status" role="status">{t('Updating reference rates…','جارٍ تحديث أسعار الصرف المرجعية…')}</p>
+            :<small className="detail-currency-updated">{t('Rates updated','آخر تحديث للأسعار')}: {formatRateDate(productRatesQuery.data.updatedAt)}</small>}
+         </>}
+      </section>
+      <p>{ar?product.descriptionAr:product.description}</p>
      <span className="choice-label">{t('COLOR','اللون')} — {ar?product.colors.find(c=>c[0]===color)?.[1]:color}</span><div className="choices">{product.colors.map(c=><button className={color===c[0]?'selected':''} key={c[0]} onClick={()=>setColor(c[0])}>{ar?c[1]:c[0]}</button>)}</div>
      <div style={{display:'flex',justifyContent:'space-between',alignItems:'end'}}><span className="choice-label">{t('SELECT SIZE','اختاري المقاس')}</span><button className="text-link" onClick={()=>setDialog('size')}>{t('Size guide','دليل المقاسات')}</button></div><div className="choices">{product.sizes.map(s=><button key={s} className={s===size?'selected':''} onClick={()=>setSize(s)}>{s}</button>)}</div>
      <div className="buy-row"><button className="btn" onClick={addToBag}>{t('ADD TO SHOPPING BAG','أضيفي إلى الحقيبة')}<ShoppingBag/></button><button className="icon-btn" onClick={()=>void favorite(product.id)} disabled={!authReady||favoriteLoading||favoriteBusyIds.includes(product.id)} aria-busy={favoriteBusyIds.includes(product.id)||favoriteLoading} aria-label={favorites.includes(product.id)?t('Remove favorite','إزالة من المفضلة'):t('Save favorite','حفظ في المفضلة')} aria-pressed={favorites.includes(product.id)}><Heart fill={favorites.includes(product.id)?'currentColor':'none'}/></button></div>
@@ -343,6 +375,7 @@ export function Boutique({products,boutiques,lang,setLang}:Catalog & {lang:'en'|
   {page==='instagram'&&<><p>{t('A visual diary of sunlit silhouettes and independent style. This is a demo editorial gallery, not a connected Instagram account.','يوميات بصرية لقصّات مضيئة وأناقة مستقلة. هذا معرض تحريري تجريبي وليس حساب إنستغرام متصلاً.')}</p><div className="products" style={{gridTemplateColumns:'repeat(2,minmax(0,1fr))'}}>{products.slice(0,4).map(card)}</div></>}
   </div></>}
   </main>
+  {page!=='companion'&&<button className="stylist-float" type="button" data-testid="button-open-stylist" aria-label={t('Ask Your Stylist','اسألي منسقة الأزياء')} onClick={()=>go('companion')}><MessageCircle aria-hidden="true"/><span>{t('Ask Your Stylist','اسألي منسقة الأزياء')}</span></button>}
   <footer className="footer"><div className="footer-top"><div><button onClick={()=>go('home')} style={{padding:0}} aria-label={t('Home','الرئيسية')}>{logo()}</button><p>{t('One Place. Endless Styles.','مكان واحد. أناقة بلا حدود.')}<br/>{t('A considered collection of independent voices.','مختارات مدروسة من رؤى مستقلة.')}</p></div><div className="footer-links"><span className="eyebrow">{t('DISCOVER','اكتشفي')}</span><button onClick={()=>go('abayas')}>{t('Abayas','العبايات')}</button><button onClick={()=>go('women')}>{t('Women’s Clothing','الملابس النسائية')}</button><button onClick={()=>go('boutiques')}>{t('Our boutiques','بوتيكاتنا')}</button><button onClick={()=>go('new')}>{t('New arrivals','وصل حديثاً')}</button></div><div className="footer-links"><span className="eyebrow">{t('THE FINER DETAILS','التفاصيل المهمة')}</span>{(['about','contact','instagram','privacy','terms'] as Page[]).map(p=><button key={p} onClick={()=>go(p)}>{p==='about'?t('About us','من نحن'):p==='contact'?t('Contact us','تواصلي معنا'):p==='instagram'?t('Instagram','إنستغرام'):p==='privacy'?t('Privacy policy','سياسة الخصوصية'):t('Terms & conditions','الشروط والأحكام')}</button>)}</div></div><div className="footer-bottom"><span>© {new Date().getFullYear()} F9 BOUTIQUE. {t('ALL RIGHTS RESERVED.','جميع الحقوق محفوظة.')}</span><span>{t('KUWAIT · KWD  /  DEMO EXPERIENCE · NO REAL ORDERS','الكويت · د.ك / تجربة توضيحية · لا طلبات فعلية')}</span></div></footer>
   {compare.length>0&&page!=='compare'&&<div className="compare-bar"><Scale/><span>{compare.length}/3 {t('pieces selected','قطع مختارة')}</span><button className="btn" onClick={()=>go('compare')}>{t('Compare pieces','مقارنة القطع')}<ArrowRight/></button><button className="icon-btn" onClick={()=>setCompare([])} aria-label={t('Clear comparison','مسح المقارنة')}><X/></button></div>}
   {toast&&<div className="toast" role="status"><Check/><span>{toast}</span><button className="icon-btn" onClick={()=>setToast('')} aria-label={t('Dismiss','إغلاق')}><X/></button></div>}

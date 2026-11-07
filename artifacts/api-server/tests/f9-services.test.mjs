@@ -16,20 +16,35 @@ await build({
 });
 const originalFetch = globalThis.fetch;
 const originalKey = process.env.OPENROUTER_API_KEY;
+const originalSupabaseUrl = process.env.SUPABASE_URL;
+const originalSupabaseKey = process.env.SUPABASE_PUBLISHABLE_KEY;
 const rates = {
   result: "success", base_code: "KWD", time_last_update_unix: 1793750551,
   time_next_update_unix: 1793838381,
   rates: { KWD: 1, USD: 3.25, EUR: 3, GBP: 2.5, SAR: 12, AED: 12, QAR: 12, BHD: 1.2, OMR: 1.25 },
 };
 const question = { messages: [{ role: "user", content: "How do I style a silk abaya?" }], language: "en" };
+const catalogBoutique = { id: 31, name: "Noor Atelier", ar: "نور أتيليه", mark: "N", line: "Sculptural silhouettes", lineAr: "قصّات منحوتة", story: "A considered edit.", storyAr: "مختارات مدروسة." };
+const catalogProduct = { id: 73, name: "Silk Abaya", ar: "عباية حرير", brand: 31, price: 48.5, image: "silk", category: "abayas", sizes: ["S", "M"], colors: [["Pearl", "لؤلؤي", "#eee"]], description: "A fluid silk abaya.", descriptionAr: "عباية حرير انسيابية.", fresh: true, best: false };
 
-async function scenario(mock, run, key = "test-only-not-a-real-key") {
+async function scenario(mock, run, key = "test-only-not-a-real-key", catalogAvailable = true) {
   delete require.cache[require.resolve(bundle)];
   const router = require(bundle).default;
   if (key === null) delete process.env.OPENROUTER_API_KEY;
   else process.env.OPENROUTER_API_KEY = key;
-  globalThis.fetch = async (url, init) => String(url).startsWith("http://127.0.0.1:")
-    ? originalFetch(url, init) : mock(url, init);
+  process.env.SUPABASE_URL = "https://catalog-test.supabase.co";
+  process.env.SUPABASE_PUBLISHABLE_KEY = "test-only-publishable";
+  globalThis.fetch = async (url, init) => {
+    const target = String(url);
+    if (target.startsWith("http://127.0.0.1:")) return originalFetch(url, init);
+    if (target.startsWith("https://catalog-test.supabase.co/rest/v1/products")) {
+      return catalogAvailable ? Response.json([catalogProduct]) : new Response("", { status: 502 });
+    }
+    if (target.startsWith("https://catalog-test.supabase.co/rest/v1/boutiques")) {
+      return catalogAvailable ? Response.json([catalogBoutique]) : new Response("", { status: 502 });
+    }
+    return mock(url, init);
+  };
   const app = express();
   app.use(express.json());
   app.use("/api", router);
@@ -83,15 +98,29 @@ try {
       if (String(url).includes("open.er-api")) return Response.json(rates);
       assert.equal(init.headers.Authorization, "Bearer test-only-not-a-real-key");
       const prompt = JSON.parse(init.body);
-      assert.match(prompt.messages[0].content, /Trusted server-fetched reference data/);
+      assert.match(prompt.messages[0].content, /Trusted server-fetched reference rates/);
+      assert.match(prompt.messages[0].content, /Trusted Supabase catalog/);
+      assert.match(prompt.messages[0].content, /Silk Abaya/);
       assert.match(prompt.messages[0].content, /Arabic/);
-      return Response.json({ choices: [{ message: { content: "نسقي العباية الحريرية مع فستان عاجي." } }] });
+      assert.equal(prompt.response_format.type, "json_object");
+      return Response.json({ choices: [{ message: { content: JSON.stringify({ reply: "نسقي القطعة الحريرية مع لون هادئ.", recommendedProductIds: [catalogProduct.id, 999, catalogProduct.id] }) } }] });
     }, async ({ ask }) => {
       const response = await ask({ ...question, language: "ar" });
-      assert.equal(response.status, 200);
+      assert.equal(response.status, 200, JSON.stringify(await response.clone().json()));
       const body = await response.json(); assert.equal(body.ratesIncluded, true);
-      assert.match(body.reply, /عباية/); assert.ok(!JSON.stringify(body).includes("test-only"));
+      assert.match(body.reply, /الحريرية/);
+      assert.deepEqual(body.recommendedProductIds, [catalogProduct.id]);
+      assert.ok(!JSON.stringify(body).includes("test-only"));
     }));
+  await test("stylist never returns recommendations outside the current catalog", () =>
+    scenario(async url => String(url).includes("open.er-api")
+      ? Response.json(rates)
+      : Response.json({ choices: [{ message: { content: JSON.stringify({ reply: "No current item matches exactly; I can still suggest a graceful silhouette.", recommendedProductIds: [catalogProduct.id, 999] }) } }] }),
+    async ({ ask }) => {
+      const response = await ask();
+      assert.equal(response.status, 200);
+      assert.deepEqual((await response.json()).recommendedProductIds, []);
+    }, "test-only-not-a-real-key", false));
   for (const [upstreamStatus, expected, code] of [[401, 503, "AI_CONFIGURATION"], [402, 503, "AI_CREDITS"], [429, 429, "RATE_LIMITED"], [500, 502, "PROVIDER_ERROR"]]) {
     await test(`AI upstream ${upstreamStatus} handled`, () =>
       scenario(async url => String(url).includes("open.er-api") ? Response.json(rates) : new Response("", { status: upstreamStatus }), async ({ ask }) => {
@@ -103,7 +132,7 @@ try {
   await test("styling works without rates and reports that honestly; local quota prevents spam", () =>
     scenario(async url => {
       if (String(url).includes("open.er-api")) throw Error("offline");
-      return Response.json({ choices: [{ message: { content: "Choose an ivory dress." } }] });
+      return Response.json({ choices: [{ message: { content: JSON.stringify({ reply: "Choose an ivory silhouette.", recommendedProductIds: [] }) } }] });
     }, async ({ ask }) => {
       for (let i = 0; i < 8; i++) {
         const response = await ask(); assert.equal(response.status, 200);
@@ -115,5 +144,9 @@ try {
   globalThis.fetch = originalFetch;
   if (originalKey === undefined) delete process.env.OPENROUTER_API_KEY;
   else process.env.OPENROUTER_API_KEY = originalKey;
+  if (originalSupabaseUrl === undefined) delete process.env.SUPABASE_URL;
+  else process.env.SUPABASE_URL = originalSupabaseUrl;
+  if (originalSupabaseKey === undefined) delete process.env.SUPABASE_PUBLISHABLE_KEY;
+  else process.env.SUPABASE_PUBLISHABLE_KEY = originalSupabaseKey;
   await rm(folder, { recursive: true, force: true });
 }

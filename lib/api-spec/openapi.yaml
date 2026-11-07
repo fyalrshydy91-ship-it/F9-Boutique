@@ -144,10 +144,16 @@ components:
         language: { type: string, enum: [en, ar], default: en }
     StylistReply:
       type: object
-      required: [reply, ratesIncluded]
+      required: [reply, ratesIncluded, recommendedProductIds]
       properties:
         reply: { type: string }
         ratesIncluded: { type: boolean }
+        recommendedProductIds:
+          type: array
+          minItems: 0
+          maxItems: 3
+          uniqueItems: true
+          items: { type: integer, minimum: 1 }
     HealthStatus:
       type: object
       properties:
