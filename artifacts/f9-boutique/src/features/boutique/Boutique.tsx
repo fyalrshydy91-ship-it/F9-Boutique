@@ -15,11 +15,37 @@ type Page='home'|'abayas'|'women'|'new'|'boutiques'|'collection'|'product'|'favo
 // Password recovery must leave private Replit previews and return to the public storefront.
 const PASSWORD_RESET_REDIRECT_URL='https://luxury-model-designs.replit.app';
 const APPROXIMATE_CURRENCIES=['USD','EUR','GBP','SAR'] as const;
+type PasswordRecoveryUrlState='recovery'|'invalid'|null;
+function getPasswordRecoveryUrlState():PasswordRecoveryUrlState{
+ if(typeof window==='undefined')return null;
+ const query=new URLSearchParams(window.location.search);
+ const fragment=new URLSearchParams(window.location.hash.replace(/^#/,''));
+ const params=[query,fragment];
+ const get=(key:string)=>params.map(value=>value.get(key)||'').join(' ').toLowerCase();
+ const type=get('type');
+ const error=get('error');
+ const errorCode=get('error_code');
+ const description=get('error_description');
+ if(errorCode.startsWith('otp_')||errorCode.includes('flow_state')||errorCode==='invalid_grant'||error==='access_denied'||/email link|expired|invalid|already used|recovery|otp/i.test(`${error} ${description}`))return 'invalid';
+ return type.split(/\s+/).includes('recovery')?'recovery':null;
+}
+function clearSupabaseAuthCallbackFromUrl(){
+ if(typeof window==='undefined')return;
+ const url=new URL(window.location.href);
+ for(const key of ['access_token','refresh_token','expires_in','expires_at','token_type','type','error','error_code','error_description','code','state','token_hash','provider_token','provider_refresh_token'])url.searchParams.delete(key);
+ url.hash='';
+ window.history.replaceState(window.history.state,document.title,`${url.pathname}${url.search}`);
+}
+function isPasswordRecoveryFailure(error:unknown){
+ const item=error&&typeof error==='object'?error as {message?:string;code?:string}:{};
+ return /otp_|flow_state|invalid.*(token|grant|otp)|expired|already.?used|auth session missing|refresh token.*(invalid|expired)|email link/i.test(`${item.code??''} ${item.message??''}`.toLowerCase());
+}
 export function Boutique({products,boutiques,lang,setLang}:Catalog & {lang:'en'|'ar';setLang:Dispatch<SetStateAction<'en'|'ar'>>}){
+ const [initialRecoveryUrlState]=useState<PasswordRecoveryUrlState>(getPasswordRecoveryUrlState);
  const [guestFavorites,setGuestFavorites]=useStore<number[]>('f9-favorites',[]);
  const [favorites,setFavorites]=useState<number[]>([]);
  const [bag,setBag]=useStore<BagItem[]>('f9-bag',[]);
- const [page,setPage]=useState<Page>('home');
+ const [page,setPage]=useState<Page>(()=>initialRecoveryUrlState?'account':'home');
   const productRatesQuery=useGetExchangeRates({query:{enabled:page==='product',queryKey:getGetExchangeRatesQueryKey(),staleTime:0,refetchOnMount:'always',refetchOnWindowFocus:true}});
  const [selected,setSelected]=useState(1);
  const [brand,setBrand]=useState(1);
@@ -34,7 +60,7 @@ export function Boutique({products,boutiques,lang,setLang}:Catalog & {lang:'en'|
  const [savedCompare,setCompare]=useState<number[]>([]);
  const compare=savedCompare.filter(id=>products.some(p=>p.id===id));
  const [tab,setTab]=useState('featured');
- const [auth,setAuth]=useState('login');
+ const [auth,setAuth]=useState(()=>initialRecoveryUrlState==='invalid'?'forgot':'login');
  const [authUser,setAuthUser]=useState<AuthUser|null>(null);
   const [authSession,setAuthSession]=useState<AuthSession|null>(null);
  const [authReady,setAuthReady]=useState(false);
@@ -44,7 +70,10 @@ export function Boutique({products,boutiques,lang,setLang}:Catalog & {lang:'en'|
  const [accountEmail,setAccountEmail]=useState('');
  const [accountName,setAccountName]=useState('');
  const [accountPassword,setAccountPassword]=useState('');
- const [recoveryMode,setRecoveryMode]=useState(false);
+ const [recoveryConfirmPassword,setRecoveryConfirmPassword]=useState('');
+ const [showRecoveryPasswords,setShowRecoveryPasswords]=useState(false);
+ const [recoveryMode,setRecoveryMode]=useState(()=>initialRecoveryUrlState==='recovery');
+ const [recoveryLinkInvalid,setRecoveryLinkInvalid]=useState(()=>initialRecoveryUrlState==='invalid');
  const [favoriteLoading,setFavoriteLoading]=useState(false);
  const [favoriteLoadError,setFavoriteLoadError]=useState(false);
  const [favoriteBusyIds,setFavoriteBusyIds]=useState<number[]>([]);
@@ -56,6 +85,7 @@ export function Boutique({products,boutiques,lang,setLang}:Catalog & {lang:'en'|
  const guestFavoritesRef=useRef(guestFavorites);
  const favoriteRequestIds=useRef(new Set<number>());
   const ordersRequestId=useRef(0);
+  const recoveryEventSeen=useRef(false);
  const [dialog,setDialog]=useState<'checkout'|'size'|'demo'|null>(null);
  const [toast,setToast]=useState('');
  const toastTimer=useRef<ReturnType<typeof setTimeout>|null>(null);
@@ -93,6 +123,7 @@ export function Boutique({products,boutiques,lang,setLang}:Catalog & {lang:'en'|
  useEffect(()=>()=>{if(toastTimer.current)clearTimeout(toastTimer.current)},[]);
  useEffect(()=>{
   let alive=true;
+   if(initialRecoveryUrlState==='invalid')clearSupabaseAuthCallbackFromUrl();
   const {data:{subscription}}=supabase.auth.onAuthStateChange((event,session)=>{
    if(!alive)return;
    setAuthUser(session?.user??null);
@@ -102,17 +133,42 @@ export function Boutique({products,boutiques,lang,setLang}:Catalog & {lang:'en'|
     setOrders([]);setOrdersLoading(!!session?.user);setOrdersLoaded(false);setOrdersError('');
    setAuthReady(true);
    setAuthError('');
-   if(event==='PASSWORD_RECOVERY'){setRecoveryMode(true);setPage('account');}
+    if(event==='PASSWORD_RECOVERY'){
+     recoveryEventSeen.current=true;
+     setPage('account');
+     setAuth(session?.access_token?'login':'forgot');
+     setAccountPassword('');
+     setRecoveryConfirmPassword('');
+     setShowRecoveryPasswords(false);
+     setAuthNotice('');
+     setRecoveryMode(!!session?.access_token);
+     setRecoveryLinkInvalid(!session?.access_token);
+     if(session?.user.email)setAccountEmail(session.user.email);
+     clearSupabaseAuthCallbackFromUrl();
+    }
   });
   void supabase.auth.getSession().then(({data,error})=>{
    if(!alive)return;
-   if(error)setAuthError(friendlyAuthError(error));
+    if(error&&initialRecoveryUrlState!=='invalid'&&initialRecoveryUrlState!=='recovery')setAuthError(friendlyAuthError(error));
    setAuthUser(data.session?.user??null);
     setAuthSession(data.session);
+    if(initialRecoveryUrlState==='recovery'&&!recoveryEventSeen.current){
+     setPage('account');
+     setRecoveryMode(!!data.session?.access_token);
+     setRecoveryLinkInvalid(!data.session?.access_token);
+     setAuth(data.session?.access_token?'login':'forgot');
+     if(data.session?.user.email)setAccountEmail(data.session.user.email);
+     clearSupabaseAuthCallbackFromUrl();
+    }
    setAuthReady(true);
-  }).catch(error=>{if(alive){setAuthError(friendlyAuthError(error));setAuthReady(true)}});
+   }).catch(error=>{if(alive){
+    if((initialRecoveryUrlState==='recovery'||initialRecoveryUrlState==='invalid')&&!recoveryEventSeen.current){
+     setPage('account');setRecoveryMode(false);setRecoveryLinkInvalid(true);setAuth('forgot');setAuthError('');clearSupabaseAuthCallbackFromUrl();
+    }else if(initialRecoveryUrlState!=='recovery'&&initialRecoveryUrlState!=='invalid')setAuthError(friendlyAuthError(error));
+    setAuthReady(true);
+   }});
   return()=>{alive=false;subscription.unsubscribe()};
- },[]);
+  },[]);
  useEffect(()=>{guestFavoritesRef.current=guestFavorites},[guestFavorites]);
   useEffect(()=>{
    if(page!=='orders'){
@@ -235,10 +291,16 @@ export function Boutique({products,boutiques,lang,setLang}:Catalog & {lang:'en'|
   const email=accountEmail.trim().toLowerCase();
   try{
    if(recoveryMode){
+     if(!authSession?.access_token){
+      setRecoveryMode(false);setRecoveryLinkInvalid(true);setAuth('forgot');setAuthError('');return;
+     }
+     if(accountPassword.length<8){setAuthError(t('Use a password with at least 8 characters.','استخدمي كلمة مرور من ٨ أحرف على الأقل.'));return}
+     if(accountPassword!==recoveryConfirmPassword){setAuthError(t('The passwords do not match.','كلمتا المرور غير متطابقتين.'));return}
     const {error}=await supabase.auth.updateUser({password:accountPassword});
     if(error)throw error;
-    setRecoveryMode(false);setAccountPassword('');
-    setAuthNotice(t('Your password has been updated.','تم تحديث كلمة المرور.'));
+     setRecoveryMode(false);setRecoveryLinkInvalid(false);setAccountPassword('');setRecoveryConfirmPassword('');setShowRecoveryPasswords(false);setAuth('login');
+     setAuthNotice(t('Your password has been updated. You can now log in with your new password.','تم تحديث كلمة المرور. يمكنك الآن تسجيل الدخول باستخدام كلمة المرور الجديدة.'));
+     void supabase.auth.signOut({scope:'local'}).catch(()=>{});
    }else if(auth==='signup'){
     const {data,error}=await supabase.auth.signUp({email,password:accountPassword,options:{data:accountName.trim()?{full_name:accountName.trim()}:undefined,emailRedirectTo:window.location.origin}});
     if(error)throw error;
@@ -249,6 +311,7 @@ export function Boutique({products,boutiques,lang,setLang}:Catalog & {lang:'en'|
      const {error}=await supabase.auth.resetPasswordForEmail(email,{redirectTo:PASSWORD_RESET_REDIRECT_URL});
     if(error)throw error;
     setAuthNotice(t('If that email is registered, a password reset link is on its way.','إذا كان البريد مسجلاً، فسيصلك رابط لإعادة تعيين كلمة المرور.'));
+     setRecoveryLinkInvalid(false);
     setAuth('login');
    }else{
     const {error}=await supabase.auth.signInWithPassword({email,password:accountPassword});
@@ -256,7 +319,11 @@ export function Boutique({products,boutiques,lang,setLang}:Catalog & {lang:'en'|
     setAuthNotice(t('You are signed in.','تم تسجيل دخولك.'));
     setAccountPassword('');
    }
-  }catch(error){setAuthError(friendlyAuthError(error))}
+   }catch(error){
+    if(recoveryMode&&isPasswordRecoveryFailure(error)){
+     setRecoveryMode(false);setRecoveryLinkInvalid(true);setAccountPassword('');setRecoveryConfirmPassword('');setAuth('forgot');setAuthError('');
+    }else setAuthError(friendlyAuthError(error));
+   }
   finally{setAuthBusy(false)}
  };
  const signOut=async()=>{if(authBusy)return;setAuthBusy(true);setAuthError('');try{const {error}=await supabase.auth.signOut();if(error)throw error;setAuthNotice(t('You are signed out. Guest favorites remain on this device.','تم تسجيل خروجك. تبقى مفضلة الزائرة محفوظة على هذا الجهاز.'))}catch(error){setAuthError(friendlyAuthError(error))}finally{setAuthBusy(false)}};
