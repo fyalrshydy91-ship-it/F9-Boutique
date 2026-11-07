@@ -22,5 +22,15 @@ timeoutMs = 20000
 [userenv]
 
 [userenv.shared]
+
+[userenv.development]
 SUPABASE_PUBLISHABLE_KEY = "sb_publishable_CkQwZVVpFO9nq9k7icY9qw_l2uEzvEr"
 SUPABASE_URL = "https://awpolfkwozqnguotfteo.supabase.co"
+VITE_SUPABASE_PUBLISHABLE_KEY = "sb_publishable_CkQwZVVpFO9nq9k7icY9qw_l2uEzvEr"
+VITE_SUPABASE_URL = "https://awpolfkwozqnguotfteo.supabase.co"
+
+[userenv.production]
+SUPABASE_PUBLISHABLE_KEY = "sb_publishable_CkQwZVVpFO9nq9k7icY9qw_l2uEzvEr"
+SUPABASE_URL = "https://awpolfkwozqnguotfteo.supabase.co"
+VITE_SUPABASE_PUBLISHABLE_KEY = "sb_publishable_CkQwZVVpFO9nq9k7icY9qw_l2uEzvEr"
+VITE_SUPABASE_URL = "https://awpolfkwozqnguotfteo.supabase.co"

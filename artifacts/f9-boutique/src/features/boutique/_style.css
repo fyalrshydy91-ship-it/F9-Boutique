@@ -434,3 +434,13 @@
   .f9[dir=rtl] .dialog p, .f9[dir=rtl] details,
   .f9[dir=rtl] details p { font-size: 14px; }
 }
+.f9 .auth-error, .f9 .auth-notice, .f9 .auth-privacy {
+  padding: 13px 15px;
+  border-inline-start: 2px solid #9d8060;
+  background: #e8d5bd42;
+  line-height: 1.7;
+}
+.f9 .auth-error { color: #7c332d; }
+.f9 .auth-notice { color: #364c3f; }
+.f9 .auth-privacy { font-size: 13px; color: #685f57; }
+.f9 .account-form button:disabled { opacity: .58; cursor: wait; }
