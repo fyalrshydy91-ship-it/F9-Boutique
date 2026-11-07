@@ -11,6 +11,8 @@ import './_style.css';
 import './_responsive.css';
 
 type Page='home'|'abayas'|'women'|'new'|'boutiques'|'collection'|'product'|'favorites'|'bag'|'account'|'orders'|'search'|'compare'|'about'|'contact'|'privacy'|'terms'|'instagram'|'companion';
+// Password recovery must leave private Replit previews and return to the public storefront.
+const PASSWORD_RESET_REDIRECT_URL='https://luxury-model-designs.replit.app';
 export function Boutique({products,boutiques,lang,setLang}:Catalog & {lang:'en'|'ar';setLang:Dispatch<SetStateAction<'en'|'ar'>>}){
  const [guestFavorites,setGuestFavorites]=useStore<number[]>('f9-favorites',[]);
  const [favorites,setFavorites]=useState<number[]>([]);
@@ -232,7 +234,7 @@ export function Boutique({products,boutiques,lang,setLang}:Catalog & {lang:'en'|
     else setAuthNotice(t('Check your email to confirm your account, then log in.','تحققي من بريدك لتأكيد الحساب، ثم سجّلي الدخول.'));
     setAccountPassword('');setAuth('login');
    }else if(auth==='forgot'){
-    const {error}=await supabase.auth.resetPasswordForEmail(email,{redirectTo:window.location.origin});
+     const {error}=await supabase.auth.resetPasswordForEmail(email,{redirectTo:PASSWORD_RESET_REDIRECT_URL});
     if(error)throw error;
     setAuthNotice(t('If that email is registered, a password reset link is on its way.','إذا كان البريد مسجلاً، فسيصلك رابط لإعادة تعيين كلمة المرور.'));
     setAuth('login');
