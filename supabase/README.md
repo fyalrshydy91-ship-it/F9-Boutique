@@ -31,7 +31,7 @@ The migration is in `migrations/20261107_f9_catalog.sql`. `seed.sql` contains th
 - `fresh` marks new arrivals; `best` marks featured/bestselling pieces.
 - The app refetches on window focus and every 60 seconds. Reloading fetches the current catalog immediately.
 
-The authenticated account and favorites connection is described below. The shopping bag, demo checkout, and AI conversation storage were not migrated to Supabase. The shopping bag remains browser-local. If a saved product is removed from the catalog, its bag entry remains visible as unavailable until the user removes it.
+The authenticated account and favorites connection is described below. The shopping bag remains browser-local. Checkout records a KWD order from the existing bag only; it does not charge a customer or arrange delivery. If a saved product is removed from the catalog, its bag entry remains visible as unavailable until the user removes it.
 
 ## Authentication and account favorites
 
@@ -41,7 +41,9 @@ Authenticated favorites are rows in `public.favorites`; their composite key is `
 
 ### My Orders
 
-`public.orders` is the read-only customer order history. Each row references `auth.users(id)`, has order metadata and an item snapshot, and is sorted newest-first in the app. The protected My Orders view requires a current session with an access token, verifies the user against Supabase Auth, then queries only that user's records. RLS independently checks `auth.uid() = user_id`. Only `authenticated` receives `SELECT`; `anon`, `authenticated` writes, and browser-side order creation are not granted. The table starts empty—F9 does not create or display sample orders.
+`public.orders` stores account-owned order records with a UUID, unique order number, KWD total, status (`Pending`, `Processing`, `Completed`, or `Cancelled`), creation time, and a product/boutique/variant snapshot. The protected My Orders view requires a current access token, verifies the user against Supabase Auth, and queries only that user's rows. RLS independently limits reads to `auth.uid() = user_id`; authenticated users have no update or delete rights.
+
+Checkout calls the `public.place_f9_order(jsonb)` `SECURITY INVOKER` RPC. The function accepts only product IDs, selected sizes/colors, and quantities; it re-reads current prices and boutique/product details from Supabase, validates the selections, assigns the authenticated user, generates the order ID/number/date, and records a `Pending` KWD order. RLS requires the inserted `user_id` to match `auth.uid()`. Direct client writes cannot change status or creation time. No service-role key is used, and no payment is processed. The table remains empty until an authenticated customer places an order; no sample orders are seeded.
 
 ### Auth Dashboard settings
 
@@ -50,7 +52,7 @@ Authenticated favorites are rows in `public.favorites`; their composite key is `
 - Configure **Authentication → URL Configuration** so email confirmations and recovery links return to the app:
   - Site URL: `https://luxury-model-designs.replit.app`
   - Redirect URLs: `https://luxury-model-designs.replit.app/**` and the current preview, `https://4730a85c-94b9-4b28-91b7-4cb5922266a5-00-1465gikooptme.pike.replit.dev/**`. Add the current preview origin again if Replit changes it.
-  - The app uses `window.location.origin` for confirmation and password-recovery redirect requests.
+  - Sign-up confirmation uses `window.location.origin`; password recovery redirects to `https://luxury-model-designs.replit.app/?f9_recovery=1`.
 - For reliable confirmation and recovery email delivery at production scale, configure custom SMTP. Supabase's built-in email service has provider rate limits.
 
 The auth page and app metadata are bilingual, but Supabase's default confirmation and recovery emails use the project email templates; localizing those templates is a separate dashboard setting.
@@ -64,6 +66,6 @@ pnpm --filter @workspace/f9-boutique run typecheck
 PORT=25340 BASE_PATH=/ pnpm --filter @workspace/f9-boutique run build
 ```
 
-On Preview, `GET /api/catalog` should return six products and three boutiques initially. To check My Orders, open Account → My orders while signed in; the empty state is expected until an order is created through a trusted process. Sign out and try the same page; it should return to Account → Log in. The Orders table has no client insert/update/delete grants, and its only RLS policy is a select policy scoped to `auth.uid()`.
+On Preview, `GET /api/catalog` should return six products and three boutiques initially. Sign in, add an available product and variant to the bag, review it, and place the order. The app should navigate to My Orders and show the order number, status, item snapshots, KWD total, and creation date. Sign out and try My Orders; it should return to Account → Log in. Check Supabase policies: authenticated SELECT and INSERT are scoped to the current user; no UPDATE/DELETE privileges or policies are granted. Anonymous users cannot execute the order RPC. The Supabase order migrations are applied directly to the connected Supabase project, not Replit's database.
 
 Republish to update the public app, including both Supabase environment variables in production. This repository's migration/seed are applied to the connected Supabase project, not to Replit's database or via automatic deployment migrations.

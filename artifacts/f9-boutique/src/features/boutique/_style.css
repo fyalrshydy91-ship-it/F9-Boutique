@@ -472,9 +472,31 @@
 .f9 .order-status { padding: 7px 12px; border: 1px solid var(--line); color: var(--ink); font-size: 12px; }
 .f9 .order-card-details { margin-top: 20px; color: #766c63; font-size: 13px; flex-wrap: wrap; }
 .f9 .order-card-details strong { color: var(--ink); font-size: 15px; }
+.f9 .order-items { margin-top: 18px; border-top: 1px solid var(--line); }
+.f9 .order-item { display: grid; grid-template-columns: 68px minmax(0, 1fr) auto; align-items: center; gap: 16px; padding: 16px 0; border-bottom: 1px solid var(--line); }
+.f9 .order-item > img { width: 68px; height: 84px; object-fit: cover; }
+.f9 .order-item-copy .boutique-name { font-size: 11px; }
+.f9 .order-item-copy h3 { margin: 4px 0; font: 20px var(--serif); }
+.f9 .order-item-copy p { margin: 4px 0 0; color: #766c63; font-size: 12px; }
+.f9 .order-item > strong { white-space: nowrap; font-size: 13px; }
+.f9 .checkout-items { display: grid; gap: 0; max-height: min(40vh, 320px); overflow-y: auto; margin: 18px 0; border-top: 1px solid var(--line); }
+.f9 .checkout-item { display: grid; grid-template-columns: 58px minmax(0, 1fr) auto; align-items: center; gap: 12px; padding: 14px 0; border-bottom: 1px solid var(--line); }
+.f9 .checkout-item > img { width: 58px; height: 72px; object-fit: cover; }
+.f9 .checkout-item h3 { margin: 4px 0; font: 18px var(--serif); }
+.f9 .checkout-item p { margin: 0; color: #766c63; font-size: 12px; line-height: 1.6; }
+.f9 .checkout-item strong { white-space: nowrap; font-size: 13px; }
+.f9 .checkout-total { margin: 8px 0 18px; }
+.f9 .dialog .btn:disabled { opacity: .58; cursor: wait; }
 @media (max-width: 600px) {
   .f9 .orders-list { width: 92%; }
   .f9 .order-card { padding: 19px 16px; }
   .f9 .order-card-top h2 { font-size: 23px; }
   .f9 .order-card-details { justify-content: flex-start; column-gap: 14px; row-gap: 8px; }
+  .f9 .order-item { grid-template-columns: 54px minmax(0, 1fr); gap: 10px; padding: 13px 0; }
+  .f9 .order-item > img { width: 54px; height: 72px; }
+  .f9 .order-item > strong { grid-column: 2; justify-self: end; }
+  .f9 .order-item-copy h3 { font-size: 18px; }
+  .f9 .checkout-item { grid-template-columns: 48px minmax(0, 1fr); gap: 10px; }
+  .f9 .checkout-item > img { width: 48px; height: 62px; }
+  .f9 .checkout-item > strong { grid-column: 2; justify-self: end; }
 }

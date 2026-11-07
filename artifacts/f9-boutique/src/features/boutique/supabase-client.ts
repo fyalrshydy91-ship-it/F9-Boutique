@@ -8,6 +8,33 @@ type Json =
   | { [key: string]: Json | undefined }
   | Json[];
 
+export type SupabaseJson = Json;
+export type OrderStatus = 'Pending' | 'Processing' | 'Completed' | 'Cancelled';
+export type OrderItemSnapshot = {
+  product_id: number;
+  product_name: string;
+  product_name_ar: string;
+  boutique_name: string;
+  boutique_name_ar: string;
+  image: string;
+  size: string;
+  color: string;
+  color_ar: string;
+  quantity: number;
+  unit_price: number;
+  line_total: number;
+};
+export type OrderRecord = {
+  id: string;
+  user_id: string;
+  order_number: string;
+  status: OrderStatus;
+  total: number;
+  currency: string;
+  items: Json;
+  created_at: string;
+};
+
 type Database = {
   public: {
     Tables: {
@@ -18,21 +45,12 @@ type Database = {
         Relationships: [];
       };
       orders: {
-        Row: {
-          id: string;
-          user_id: string;
-          order_number: string;
-          status: string;
-          total: number;
-          currency: string;
-          items: Json;
-          created_at: string;
-        };
+        Row: OrderRecord;
         Insert: {
           id?: string;
           user_id: string;
           order_number: string;
-          status: string;
+          status: OrderStatus;
           total: number;
           currency?: string;
           items?: Json;
@@ -42,7 +60,7 @@ type Database = {
           id?: string;
           user_id?: string;
           order_number?: string;
-          status?: string;
+          status?: OrderStatus;
           total?: number;
           currency?: string;
           items?: Json;
@@ -52,7 +70,12 @@ type Database = {
       };
     };
     Views: Record<string, never>;
-    Functions: Record<string, never>;
+    Functions: {
+      place_f9_order: {
+        Args: { p_order_items: Json };
+        Returns: Json;
+      };
+    };
     Enums: Record<string, never>;
     CompositeTypes: Record<string, never>;
   };

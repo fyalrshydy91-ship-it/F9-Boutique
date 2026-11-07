@@ -27,11 +27,11 @@ The user expanded the scope for Day 3 to include real public currency rates and 
 
 **How to apply:** Keep external service calls server-side. Use the user's own OpenRouter key in Replit Secrets for this class requirement rather than substituting Replit-billed AI access.
 
-The user initially chose Supabase for products and boutiques only, then explicitly expanded scope to accounts and saved favorites. Preserve the approved catalog and product IDs; the shopping bag remains browser-local.
+The user initially chose Supabase for products and boutiques only, then explicitly expanded scope to accounts, saved favorites, and authenticated order recording. Preserve the approved catalog and product IDs; the shopping bag remains browser-local.
 
 **Why:** The user selected “Products and boutiques” when asked which part of F9 Supabase should power.
 
-**How to apply:** Keep catalog access publicly readable but not publicly writable. Account authentication and favorites are now explicitly in scope; checkout and an administrative editor are not.
+**How to apply:** Keep catalog access publicly readable but not publicly writable. Account authentication, favorites, and recording orders from the local bag are in scope; real payments are not.
 
 The user later explicitly expanded F9's Supabase scope to email authentication and private per-user favorites. The shopping bag remains browser-local. Browser credentials must use only the Supabase publishable key; private favorites are protected by `auth.uid()` RLS.
 
@@ -39,8 +39,8 @@ The user later explicitly expanded F9's Supabase scope to email authentication a
 
 **How to apply:** Treat the public/publishable key as safe for browser use, never include an admin/service-role key in `VITE_*`, and keep each customer table limited to the rows belonging to its verified Supabase Auth user.
 
-The user requested a protected, read-only My Orders page backed by a per-user `orders` table; keep the table empty until a trusted order workflow supplies real orders.
+The user expanded My Orders into an authenticated order-recording flow, with snapshots of catalog items, selected variants, and KWD totals. No real payments or delivery are part of the flow; do not create sample orders.
 
-**Why:** The user explicitly said not to invent sample orders and asked for authentication, ownership isolation, and no user-side changes to orders.
+**Why:** The user explicitly requested checkout order recording, per-user isolation, no service-role exposure, and no payment processing.
 
-**How to apply:** Verify the Supabase access token before loading orders, enforce `auth.uid() = user_id` in RLS, and grant authenticated users SELECT only.
+**How to apply:** Verify the access token before reading orders, enforce owner-only SELECT/INSERT with `auth.uid()`, calculate snapshots from the live catalog, and keep customer UPDATE/DELETE blocked. Status starts `Pending`; later status changes require a trusted admin path.
