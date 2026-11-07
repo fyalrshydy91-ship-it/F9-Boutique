@@ -38,3 +38,9 @@ The user later explicitly expanded F9's Supabase scope to email authentication a
 **Why:** The user specifically requested Supabase Auth, favorites scoped to each account, and no frontend service-role secret.
 
 **How to apply:** Treat the public/publishable key as safe for browser use, never include an admin/service-role key in `VITE_*`, and keep each customer table limited to the rows belonging to its verified Supabase Auth user.
+
+The user requested a protected, read-only My Orders page backed by a per-user `orders` table; keep the table empty until a trusted order workflow supplies real orders.
+
+**Why:** The user explicitly said not to invent sample orders and asked for authentication, ownership isolation, and no user-side changes to orders.
+
+**How to apply:** Verify the Supabase access token before loading orders, enforce `auth.uid() = user_id` in RLS, and grant authenticated users SELECT only.

@@ -39,6 +39,10 @@ The account page uses Supabase Auth email/password signup, sign-in, sign-out, em
 
 Authenticated favorites are rows in `public.favorites`; their composite key is `(user_id, product_id)`. Supabase Auth supplies the signed user ID, and RLS requires `auth.uid() = user_id` for reads, inserts, and deletes. The browser always filters queries by the current account, but RLS is the actual security boundary. Logged-out visitors continue to use browser-local favorites; on sign-in those guest favorites are added to the user's own list. The shopping bag stays local.
 
+### My Orders
+
+`public.orders` is the read-only customer order history. Each row references `auth.users(id)`, has order metadata and an item snapshot, and is sorted newest-first in the app. The protected My Orders view requires a current session with an access token, verifies the user against Supabase Auth, then queries only that user's records. RLS independently checks `auth.uid() = user_id`. Only `authenticated` receives `SELECT`; `anon`, `authenticated` writes, and browser-side order creation are not granted. The table starts empty—F9 does not create or display sample orders.
+
 ### Auth Dashboard settings
 
 - Enable **Email** under **Authentication → Providers**.
@@ -60,6 +64,6 @@ pnpm --filter @workspace/f9-boutique run typecheck
 PORT=25340 BASE_PATH=/ pnpm --filter @workspace/f9-boutique run build
 ```
 
-On Preview, `GET /api/catalog` should return six products and three boutiques initially. Try sign-up with an address you control, confirm the email if required, log in, favorite a product, log out, then log in again and verify it remains in the account. Log in with a different account and verify it does not see the first account's favorites. Guest favorites continue to work while logged out.
+On Preview, `GET /api/catalog` should return six products and three boutiques initially. To check My Orders, open Account → My orders while signed in; the empty state is expected until an order is created through a trusted process. Sign out and try the same page; it should return to Account → Log in. The Orders table has no client insert/update/delete grants, and its only RLS policy is a select policy scoped to `auth.uid()`.
 
 Republish to update the public app, including both Supabase environment variables in production. This repository's migration/seed are applied to the connected Supabase project, not to Replit's database or via automatic deployment migrations.

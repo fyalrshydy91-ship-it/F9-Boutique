@@ -444,3 +444,17 @@
 .f9 .auth-notice { color: #364c3f; }
 .f9 .auth-privacy { font-size: 13px; color: #685f57; }
 .f9 .account-form button:disabled { opacity: .58; cursor: wait; }
+.f9 .orders-page { padding: 24px 0 88px; }
+.f9 .orders-list { width: min(880px, 88%); margin: 0 auto; display: grid; gap: 14px; }
+.f9 .order-card { padding: 24px 26px; border: 1px solid var(--line); background: #fffdfa; }
+.f9 .order-card-top, .f9 .order-card-details { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
+.f9 .order-card-top h2 { margin: 8px 0 0; font: 28px var(--serif); }
+.f9 .order-status { padding: 7px 12px; border: 1px solid var(--line); color: var(--ink); font-size: 12px; }
+.f9 .order-card-details { margin-top: 20px; color: #766c63; font-size: 13px; flex-wrap: wrap; }
+.f9 .order-card-details strong { color: var(--ink); font-size: 15px; }
+@media (max-width: 600px) {
+  .f9 .orders-list { width: 92%; }
+  .f9 .order-card { padding: 19px 16px; }
+  .f9 .order-card-top h2 { font-size: 23px; }
+  .f9 .order-card-details { justify-content: flex-start; column-gap: 14px; row-gap: 8px; }
+}

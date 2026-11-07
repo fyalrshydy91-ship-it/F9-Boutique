@@ -1,5 +1,13 @@
 import { createClient } from '@supabase/supabase-js';
 
+type Json =
+  | string
+  | number
+  | boolean
+  | null
+  | { [key: string]: Json | undefined }
+  | Json[];
+
 type Database = {
   public: {
     Tables: {
@@ -7,6 +15,39 @@ type Database = {
         Row: { user_id: string; product_id: number; created_at: string };
         Insert: { user_id: string; product_id: number; created_at?: string };
         Update: { user_id?: string; product_id?: number; created_at?: string };
+        Relationships: [];
+      };
+      orders: {
+        Row: {
+          id: string;
+          user_id: string;
+          order_number: string;
+          status: string;
+          total: number;
+          currency: string;
+          items: Json;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          user_id: string;
+          order_number: string;
+          status: string;
+          total: number;
+          currency?: string;
+          items?: Json;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          user_id?: string;
+          order_number?: string;
+          status?: string;
+          total?: number;
+          currency?: string;
+          items?: Json;
+          created_at?: string;
+        };
         Relationships: [];
       };
     };

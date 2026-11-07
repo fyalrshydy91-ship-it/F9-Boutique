@@ -1,6 +1,6 @@
 import {useEffect,useRef,useState,type Dispatch,type FormEvent,type SetStateAction} from 'react';
 import type {Catalog} from '@workspace/api-client-react';
-import type {User as AuthUser} from '@supabase/supabase-js';
+import type {Session as AuthSession,User as AuthUser} from '@supabase/supabase-js';
 import {ArrowRight,ArrowUpRight,Check,ChevronRight,Heart,Menu,Minus,Plus,Search,ShoppingBag,SlidersHorizontal,Sparkles,User,X,Scale,MapPin,PackageCheck} from 'lucide-react';
 import {image,blankFilters,type Product,type BagItem,type Filters} from './_data';
 import {useStore} from './_use-store';
@@ -10,7 +10,7 @@ import {supabase} from './supabase-client';
 import './_style.css';
 import './_responsive.css';
 
-type Page='home'|'abayas'|'women'|'new'|'boutiques'|'collection'|'product'|'favorites'|'bag'|'account'|'search'|'compare'|'about'|'contact'|'privacy'|'terms'|'instagram'|'companion';
+type Page='home'|'abayas'|'women'|'new'|'boutiques'|'collection'|'product'|'favorites'|'bag'|'account'|'orders'|'search'|'compare'|'about'|'contact'|'privacy'|'terms'|'instagram'|'companion';
 export function Boutique({products,boutiques,lang,setLang}:Catalog & {lang:'en'|'ar';setLang:Dispatch<SetStateAction<'en'|'ar'>>}){
  const [guestFavorites,setGuestFavorites]=useStore<number[]>('f9-favorites',[]);
  const [favorites,setFavorites]=useState<number[]>([]);
@@ -31,6 +31,7 @@ export function Boutique({products,boutiques,lang,setLang}:Catalog & {lang:'en'|
  const [tab,setTab]=useState('featured');
  const [auth,setAuth]=useState('login');
  const [authUser,setAuthUser]=useState<AuthUser|null>(null);
+  const [authSession,setAuthSession]=useState<AuthSession|null>(null);
  const [authReady,setAuthReady]=useState(false);
  const [authBusy,setAuthBusy]=useState(false);
  const [authError,setAuthError]=useState('');
@@ -42,8 +43,14 @@ export function Boutique({products,boutiques,lang,setLang}:Catalog & {lang:'en'|
  const [favoriteLoading,setFavoriteLoading]=useState(false);
  const [favoriteLoadError,setFavoriteLoadError]=useState(false);
  const [favoriteBusyIds,setFavoriteBusyIds]=useState<number[]>([]);
+  const [orders,setOrders]=useState<Array<{id:string;order_number:string;status:string;total:number;currency:string;items:unknown;created_at:string}>>([]);
+  const [ordersLoading,setOrdersLoading]=useState(false);
+  const [ordersLoaded,setOrdersLoaded]=useState(false);
+  const [ordersError,setOrdersError]=useState('');
+  const [ordersRetry,setOrdersRetry]=useState(0);
  const guestFavoritesRef=useRef(guestFavorites);
  const favoriteRequestIds=useRef(new Set<number>());
+  const ordersRequestId=useRef(0);
  const [dialog,setDialog]=useState<'checkout'|'size'|'demo'|null>(null);
  const [toast,setToast]=useState('');
  const toastTimer=useRef<ReturnType<typeof setTimeout>|null>(null);
@@ -75,8 +82,10 @@ export function Boutique({products,boutiques,lang,setLang}:Catalog & {lang:'en'|
   const {data:{subscription}}=supabase.auth.onAuthStateChange((event,session)=>{
    if(!alive)return;
    setAuthUser(session?.user??null);
+    setAuthSession(session);
    setFavorites(session?.user?[]:guestFavoritesRef.current);
    setFavoriteLoading(!!session?.user);
+    setOrders([]);setOrdersLoading(!!session?.user);setOrdersLoaded(false);setOrdersError('');
    setAuthReady(true);
    setAuthError('');
    if(event==='PASSWORD_RECOVERY'){setRecoveryMode(true);setPage('account');}
@@ -85,11 +94,80 @@ export function Boutique({products,boutiques,lang,setLang}:Catalog & {lang:'en'|
    if(!alive)return;
    if(error)setAuthError(friendlyAuthError(error));
    setAuthUser(data.session?.user??null);
+    setAuthSession(data.session);
    setAuthReady(true);
   }).catch(error=>{if(alive){setAuthError(friendlyAuthError(error));setAuthReady(true)}});
   return()=>{alive=false;subscription.unsubscribe()};
  },[]);
  useEffect(()=>{guestFavoritesRef.current=guestFavorites},[guestFavorites]);
+  useEffect(()=>{
+   if(page!=='orders'){
+    setOrders([]);setOrdersError('');setOrdersLoading(false);setOrdersLoaded(false);
+    return;
+   }
+   if(!authReady){setOrdersLoading(true);return}
+   let active=true;
+   const requestId=++ordersRequestId.current;
+   const redirectToLogin=()=>{
+    setOrders([]);setOrdersLoading(false);setOrdersLoaded(false);
+    setAuthUser(null);setAuthSession(null);setAuth('login');
+    setAuthError('');
+    setAuthNotice(t('Please log in again to view your orders.','يرجى تسجيل الدخول مجدداً لعرض طلباتك.'));
+    setPage('account');
+    void supabase.auth.signOut({scope:'local'}).catch(()=>{});
+   };
+   if(!authUser||!authSession?.access_token){
+    redirectToLogin();
+    return()=>{active=false};
+   }
+   setOrdersLoading(true);setOrdersLoaded(false);setOrdersError('');
+   void(async()=>{
+    const {data:sessionData,error:sessionError}=await supabase.auth.getSession();
+    if(!active||requestId!==ordersRequestId.current)return;
+    const session=sessionData.session;
+    if(sessionError){
+     setOrders([]);setOrdersLoading(false);setOrdersLoaded(true);
+     setOrdersError(t('We could not verify your sign-in. Please retry.','تعذر التحقق من تسجيل الدخول. حاولي مجدداً.'));
+     return;
+    }
+    if(!session?.access_token||session.user.id!==authUser.id){
+     redirectToLogin();
+     return;
+    }
+    // getUser verifies the current session's access token with Supabase Auth.
+    const {data:identity,error:identityError}=await supabase.auth.getUser();
+    if(!active||requestId!==ordersRequestId.current)return;
+    if(identityError){
+     if(identityError.status===401||identityError.status===403||identityError.name==='AuthSessionMissingError'){redirectToLogin();return}
+     setOrders([]);setOrdersLoading(false);setOrdersLoaded(true);
+     setOrdersError(t('We could not verify your sign-in. Please retry.','تعذر التحقق من تسجيل الدخول. حاولي مجدداً.'));
+     return;
+    }
+    if(!identity.user||identity.user.id!==authUser.id||identity.user.id!==session.user.id){
+     redirectToLogin();
+     return;
+    }
+    const {data,error}=await supabase.from('orders')
+     .select('id,order_number,status,total,currency,items,created_at')
+     .eq('user_id',identity.user.id)
+     .order('created_at',{ascending:false});
+    if(!active||requestId!==ordersRequestId.current)return;
+    if(error){
+     const databaseError=error as {code?:string;message?:string};
+     if(databaseError.code==='PGRST301'||databaseError.message?.toLowerCase().includes('jwt expired')||databaseError.message?.toLowerCase().includes('invalid jwt')){redirectToLogin();return}
+     setOrders([]);setOrdersLoading(false);setOrdersLoaded(true);
+     setOrdersError(t('Your orders could not be loaded. Please retry.','تعذر تحميل طلباتك. حاولي مجدداً.'));
+     return;
+    }
+    setOrders(data??[]);setOrdersLoading(false);setOrdersLoaded(true);setOrdersError('');
+   })().catch(()=>{
+    if(active&&requestId===ordersRequestId.current){
+     setOrders([]);setOrdersLoading(false);setOrdersLoaded(true);
+     setOrdersError(t('Your orders could not be loaded. Check your connection and retry.','تعذر تحميل طلباتك. تحققي من الاتصال ثم حاولي مجدداً.'));
+    }
+   });
+   return()=>{active=false};
+  },[page,authReady,authUser,authSession,ordersRetry]);
  useEffect(()=>{
   let alive=true;
   if(!authUser){setFavorites(guestFavorites);setFavoriteLoading(false);return()=>{alive=false}};
@@ -172,7 +250,7 @@ export function Boutique({products,boutiques,lang,setLang}:Catalog & {lang:'en'|
  const addToBag=()=>{if(!size){notify(t('Please choose your size first','يرجى اختيار المقاس أولاً'));return}setBag(old=>{const found=old.find(b=>b.id===product.id&&b.size===size&&b.color===color);return found?old.map(b=>b===found?{...b,qty:b.qty+1}:b):[...old,{id:product.id,size,color,qty:1}]});notify(t('A beautiful choice. Added to your bag.','اختيار جميل. تمت الإضافة إلى حقيبتك.'))};
  const updateQty=(index:number,delta:number)=>{setBag(old=>old.map((b,i)=>i===index?{...b,qty:Math.max(1,b.qty+delta)}:b));notify(t('Bag updated','تم تحديث الحقيبة'))};
  const removeBag=(index:number)=>{setBag(old=>old.filter((_,i)=>i!==index));notify(t('Piece removed from your bag','تمت إزالة القطعة من الحقيبة'))};
-  const title=(p:Page)=>({home:t('Home','الرئيسية'),abayas:t('Abayas','العبايات'),women:t('Women’s Clothing','الملابس النسائية'),new:t('New Arrivals','وصل حديثاً'),boutiques:t('The boutique directory','دليل البوتيكات'),collection:ar?currentBrand.ar:currentBrand.name,product:ar?product.ar:product.name,favorites:t('Your favorites','مفضلتك'),bag:t('Your shopping bag','حقيبة التسوق'),account:t('Your private appointment','موعدك الخاص'),search:t('Find something exceptional','اكتشفي شيئاً استثنائياً'),compare:t('A closer look','نظرة أقرب'),about:t('A considered point of view','رؤية منتقاة بعناية'),contact:t('Let’s talk style','لنتحدث عن الأناقة'),privacy:t('Your privacy matters','خصوصيتك تهمنا'),terms:t('The finer details','التفاصيل المهمة'),instagram:t('The F9 visual diary','يوميات F9 البصرية'),companion:t('Your Shopping Companion','رفيقتك في التسوّق')})[p];
+  const title=(p:Page)=>({home:t('Home','الرئيسية'),abayas:t('Abayas','العبايات'),women:t('Women’s Clothing','الملابس النسائية'),new:t('New Arrivals','وصل حديثاً'),boutiques:t('The boutique directory','دليل البوتيكات'),collection:ar?currentBrand.ar:currentBrand.name,product:ar?product.ar:product.name,favorites:t('Your favorites','مفضلتك'),bag:t('Your shopping bag','حقيبة التسوق'),account:t('Your private appointment','موعدك الخاص'),orders:t('My orders','طلباتي'),search:t('Find something exceptional','اكتشفي شيئاً استثنائياً'),compare:t('A closer look','نظرة أقرب'),about:t('A considered point of view','رؤية منتقاة بعناية'),contact:t('Let’s talk style','لنتحدث عن الأناقة'),privacy:t('Your privacy matters','خصوصيتك تهمنا'),terms:t('The finer details','التفاصيل المهمة'),instagram:t('The F9 visual diary','يوميات F9 البصرية'),companion:t('Your Shopping Companion','رفيقتك في التسوّق')})[p];
  const logo=()=> <span className="logo"><strong>F9</strong><span>B O U T I Q U E</span></span>;
  const navItems:Page[]=['home','abayas','women','boutiques','new'];
  const card=(p:Product)=>{const b=boutiques.find(b=>b.id===p.brand)!;return <article className="product" key={p.id}>
@@ -223,7 +301,7 @@ export function Boutique({products,boutiques,lang,setLang}:Catalog & {lang:'en'|
   </section>}
   {page==='bag'&&<><div className="page-intro"><span className="eyebrow">{t('BEAUTIFUL CHOICES','اختيارات جميلة')}</span><h1>{title(page)} <span className="serif">({count})</span></h1><p>{t('Your edit, one beautiful piece at a time.','مختاراتك، قطعة جميلة تلو الأخرى.')}</p></div>{bag.length?<div className="bag-layout"><div>{bag.map((item,index)=>{const p=products.find(p=>p.id===item.id);if(!p)return <div className="bag-item" key={`${item.id}-${item.size}-${item.color}`}><p>{t('This piece is no longer available. It is excluded from your total.','هذه القطعة لم تعد متاحة، وهي غير محسوبة في الإجمالي.')}</p><button className="remove" onClick={()=>removeBag(index)}>{t('Remove','إزالة')}</button></div>;return <div className="bag-item" key={`${item.id}-${item.size}-${item.color}`}><button onClick={()=>openProduct(p)}><img src={image(p.image)} alt={ar?p.ar:p.name}/></button><div className="bag-item-info"><button className="boutique-name" onClick={()=>visitBrand(p.brand)}>{ar?boutiqueFor(p.brand).ar:boutiqueFor(p.brand).name}</button><h3>{ar?p.ar:p.name}</h3><p>{t('Size','المقاس')}: {item.size} / {ar?p.colors.find(c=>c[0]===item.color)?.[1]:item.color}</p><div className="quantity"><button disabled={item.qty===1} onClick={()=>updateQty(index,-1)} aria-label={t('Decrease quantity','تقليل الكمية')}><Minus/></button><span>{item.qty}</span><button onClick={()=>updateQty(index,1)} aria-label={t('Increase quantity','زيادة الكمية')}><Plus/></button></div><button className="remove" onClick={()=>removeBag(index)}>{t('Remove','إزالة')}</button></div><span className="bag-item-price">{money(p.price*item.qty)}</span></div>})}</div><aside className="order-summary"><h2>{t('Your selection','مختاراتك')}</h2><div className="summary-line"><span>{t('Subtotal','المجموع الفرعي')}</span><span>{money(total)}</span></div><div className="summary-line"><span>{t('Delivery','التوصيل')}</span><span>{t('By boutique','حسب البوتيك')}</span></div><div className="summary-line total"><span>{t('Item total','إجمالي القطع')}</span><span>{money(total)}</span></div><button className="btn" onClick={()=>setDialog('checkout')}>{t('REVIEW DEMO BAG','مراجعة الحقيبة التجريبية')}<ArrowRight/></button><p>{t('A frontend prototype. No real orders, payments or delivery. Final delivery fees are not calculated.','نموذج واجهة تجريبي. لا طلبات أو مدفوعات أو توصيل فعلي. رسوم التوصيل النهائية غير محسوبة.')}</p><button className="text-link" style={{marginTop:20}} onClick={()=>go('new')}>{t('Continue discovering','متابعة الاكتشاف')}</button></aside></div>:<div className="empty"><ShoppingBag/><h2>{t('A beautiful beginning.','بداية جميلة.')}</h2><p>{t('Your shopping bag is waiting for something exceptional.','حقيبتك تنتظر قطعة استثنائية.')}</p><button className="btn" onClick={()=>go('new')}>{t('Explore the latest','اكتشفي الأحدث')}</button></div>}</>}
   {page==='account'&&<section className="account"><div className="account-photo"><img src={image('silk')} alt={t('A private fashion appointment','موعد أزياء خاص')}/></div><div className="account-form"><span className="eyebrow">{t('YOUR PRIVATE APPOINTMENT','موعدك الخاص')}</span><h1>{recoveryMode?t('Choose a new password.','اختاري كلمة مرور جديدة.'):authUser?t('Welcome to F9.','مرحباً بك في F9.'):auth==='signup'?t('A little more you.','عالم يشبهك.'):auth==='forgot'?t('Reset your password.','إعادة تعيين كلمة المرور.'):t('Welcome to F9.','مرحباً بك في F9.')}</h1>
-  {authUser&&!recoveryMode?<><p>{t('Signed in as','تم تسجيل الدخول باسم')} <strong dir="ltr">{authUser.email}</strong></p><p>{t('Your favorites are saved privately to your account. Your shopping bag remains on this device.','تُحفظ مفضلتك لحسابك فقط. تبقى حقيبة التسوق على هذا الجهاز.')}</p><p>{favorites.length} {t('saved favorites','قطع في المفضلة')}{favoriteLoading?` · ${t('Loading…','جارٍ التحميل…')}`:''}</p>{favoriteLoadError&&<p className="auth-error" role="alert">{t('Could not load your saved favorites. Try again from the Favorites page.','تعذر تحميل مفضلتك. حاولي مجدداً من صفحة المفضلة.')}</p>}<button className="text-link" onClick={()=>go('favorites')}>{t('View your favorites','عرض المفضلة')}<ArrowRight/></button>{authError&&<p className="auth-error" role="alert">{authError}</p>}{authNotice&&<p className="auth-notice" role="status">{authNotice}</p>}<button className="btn" onClick={()=>void signOut()} disabled={authBusy} aria-busy={authBusy}>{authBusy?t('Signing out…','جارٍ تسجيل الخروج…'):t('Sign out','تسجيل الخروج')}</button></>
+   {authUser&&!recoveryMode?<><p>{t('Signed in as','تم تسجيل الدخول باسم')} <strong dir="ltr">{authUser.email}</strong></p><p>{t('Your favorites are saved privately to your account. Your shopping bag remains on this device.','تُحفظ مفضلتك لحسابك فقط. تبقى حقيبة التسوق على هذا الجهاز.')}</p><p>{favorites.length} {t('saved favorites','قطع في المفضلة')}{favoriteLoading?` · ${t('Loading…','جارٍ التحميل…')}`:''}</p>{favoriteLoadError&&<p className="auth-error" role="alert">{t('Could not load your saved favorites. Try again from the Favorites page.','تعذر تحميل مفضلتك. حاولي مجدداً من صفحة المفضلة.')}</p>}<button className="text-link" onClick={()=>go('favorites')}>{t('View your favorites','عرض المفضلة')}<ArrowRight/></button><button className="text-link" onClick={()=>go('orders')}>{t('My orders','طلباتي')}<PackageCheck/></button>{authError&&<p className="auth-error" role="alert">{authError}</p>}{authNotice&&<p className="auth-notice" role="status">{authNotice}</p>}<button className="btn" onClick={()=>void signOut()} disabled={authBusy} aria-busy={authBusy}>{authBusy?t('Signing out…','جارٍ تسجيل الخروج…'):t('Sign out','تسجيل الخروج')}</button></>
   :!authReady?<p role="status">{t('Checking your account…','جارٍ التحقق من حسابك…')}</p>
   :<>{!recoveryMode&&<p>{auth==='forgot'?t('We will email you a secure password-reset link.','سنرسل رابطاً آمناً لإعادة تعيين كلمة المرور إلى بريدك.'):t('Sign in or create an account to save your favorites across devices. Passwords are handled securely by Supabase Auth.','سجّلي الدخول أو أنشئي حساباً لحفظ مفضلتك بين أجهزتك. تتولى Supabase Auth حماية كلمات المرور.')}</p>}
   {!recoveryMode&&auth!=='forgot'&&<div className="tabs" role="tablist" aria-label={t('Account access','الدخول إلى الحساب')}><button type="button" role="tab" aria-selected={auth==='login'} className={auth==='login'?'selected':''} onClick={()=>{setAuth('login');setAuthError('');setAuthNotice('');setAccountPassword('')}}>{t('Log in','تسجيل الدخول')}</button><button type="button" role="tab" aria-selected={auth==='signup'} className={auth==='signup'?'selected':''} onClick={()=>{setAuth('signup');setAuthError('');setAuthNotice('');setAccountPassword('');setAccountName('')}}>{t('Sign up','إنشاء حساب')}</button></div>}
@@ -235,7 +313,25 @@ export function Boutique({products,boutiques,lang,setLang}:Catalog & {lang:'en'|
   {authError&&<p className="auth-error" role="alert">{authError}</p>}{authNotice&&<p className="auth-notice" role="status" aria-live="polite">{authNotice}</p>}
   {!recoveryMode&&<button type="button" className="text-link" onClick={()=>{setAuth(auth==='forgot'?'login':'forgot');setAuthError('');setAuthNotice('')}}>{auth==='forgot'?t('Back to log in','العودة لتسجيل الدخول'):t('Forgot your password?','نسيتِ كلمة المرور؟')}</button>}
   {!authUser&&!recoveryMode&&<p className="auth-privacy">{t('Your password is sent only to Supabase Auth; F9 does not store it. Guest favorites stay on this device.','تُرسل كلمة المرور إلى Supabase Auth فقط، ولا يحفظها F9. تبقى مفضلة الزائرة على هذا الجهاز.')}</p>}
-  </>}</div></section>}
+   </>}{authUser&&!recoveryMode&&<button className="text-link" style={{marginTop:18}} onClick={()=>go('orders')}>{t('My orders','طلباتي')}<PackageCheck/></button>}</div></section>}
+  {page==='orders'&&<section className="orders-page">
+   <div className="page-intro"><span className="eyebrow">{t('YOUR PRIVATE ACCOUNT','حسابك الخاص')}</span><h1>{title('orders')}</h1><p>{t('A private record of orders placed with F9 boutiques.','سجل خاص بالطلبات التي تمت لدى بوتيكات F9.')}</p></div>
+   {!authReady||ordersLoading||(!ordersLoaded&&!ordersError)
+    ?<div className="empty" role="status"><PackageCheck/><p>{t('Verifying your sign-in and loading orders…','جارٍ التحقق من تسجيل الدخول وتحميل الطلبات…')}</p></div>
+    :ordersError
+     ?<div className="empty" role="alert"><PackageCheck/><h2>{t('Your orders are unavailable.','تعذر الوصول إلى طلباتك.')}</h2><p>{ordersError}</p><button className="btn" disabled={ordersLoading} onClick={()=>setOrdersRetry(value=>value+1)}>{ordersLoading?t('Loading…','جارٍ التحميل…'):t('Try again','إعادة المحاولة')}</button><button className="text-link" onClick={()=>{setPage('account');setAuth('login')}}>{t('Back to account','العودة إلى الحساب')}</button></div>
+     :orders.length===0
+      ?<div className="empty"><PackageCheck/><h2>{t('No orders yet.','لا توجد طلبات بعد.')}</h2><p>{t('Your order history will appear here after an order is placed.','سيظهر سجل طلباتك هنا بعد إتمام طلب.')}</p><button className="btn" onClick={()=>go('new')}>{t('Explore the collection','اكتشفي المجموعة')}</button></div>
+      :<div className="orders-list">{orders.map(order=>{
+       const itemCount=Array.isArray(order.items)?order.items.length:0;
+       const totalLabel=new Intl.NumberFormat(ar?'ar-KW':'en-KW',{style:'currency',currency:order.currency}).format(Number(order.total));
+       const createdAt=new Intl.DateTimeFormat(ar?'ar-KW':'en-KW',{dateStyle:'medium'}).format(new Date(order.created_at));
+       return <article className="order-card" key={order.id}>
+        <div className="order-card-top"><div><span className="eyebrow">{t('ORDER','طلب')}</span><h2 dir="ltr">{order.order_number}</h2></div><span className="order-status" dir="auto">{order.status}</span></div>
+        <div className="order-card-details"><span><time dateTime={order.created_at}>{createdAt}</time></span><span>{itemCount} {itemCount===1?t('item','قطعة'):t('items','قطع')}</span><strong>{totalLabel}</strong></div>
+       </article>
+      })}</div>}
+  </section>}
   {page==='compare'&&<><div className="page-intro"><span className="eyebrow">{t('CONSIDER EVERY DETAIL','تأمّلي كل تفصيل')}</span><h1>{title(page)}</h1><p>{t('Your favorite designs, side by side. Compare up to three pieces.','تصاميمك المفضلة جنباً إلى جنب. قارني حتى ثلاث قطع.')}</p></div>{compare.length?<div className="compare-table"><table><tbody><tr><th>{t('Your edit','مختاراتك')}</th>{compare.map(id=>{const p=products.find(p=>p.id===id)!;return <td key={id}><button onClick={()=>openProduct(p)} style={{padding:0,textAlign:'start'}}><img src={image(p.image)} alt={ar?p.ar:p.name}/><h3 style={{fontSize:25}}>{ar?p.ar:p.name}</h3></button><button className="remove" style={{margin:0,marginTop:12}} onClick={()=>toggleCompare(id)}>{t('Remove','إزالة')}</button></td>})}</tr>{['boutique','price','category','sizes','colors'].map(field=><tr key={field}><th>{field==='boutique'?t('Boutique','البوتيك'):field==='price'?t('Price','السعر'):field==='category'?t('Category','الفئة'):field==='sizes'?t('Sizes','المقاسات'):t('Colors','الألوان')}</th>{compare.map(id=>{const p=products.find(p=>p.id===id)!;return <td key={id}>{field==='boutique'?(ar?boutiqueFor(p.brand).ar:boutiqueFor(p.brand).name):field==='price'?money(p.price):field==='category'?(p.category==='abayas'?t('Abayas','العبايات'):t('Women’s Clothing','الملابس النسائية')):field==='sizes'?p.sizes.join(' / '):p.colors.map(c=>ar?c[1]:c[0]).join(' / ')}</td>})}</tr>)}<tr><th/>{compare.map(id=><td key={id}><button className="btn" onClick={()=>openProduct(products.find(p=>p.id===id)!)}>{t('Choose options','اختيار التفاصيل')}</button></td>)}</tr></tbody></table></div>:<div className="empty"><Scale/><h2>{t('Compare your favorites.','قارني القطع المفضلة.')}</h2><p>{t('Select Compare on any product to begin.','اختاري «مقارنة» على أي منتج للبدء.')}</p><button className="btn" onClick={()=>go('new')}>{t('Discover pieces','اكتشفي القطع')}</button></div>}</>}
   {['about','contact','privacy','terms','instagram'].includes(page)&&<><div className="page-intro"><span className="eyebrow">F9 BOUTIQUE</span><h1>{title(page)}</h1></div><div className="info-content">
   {page==='about'&&<><h2>{t('One place. Endless styles.','مكان واحد. أناقة بلا حدود.')}</h2><p>{t('F9 Boutique is a curated discovery destination for women in Kuwait. We bring independent abaya and womenswear boutiques into one considered space — so you can spend less time searching and more time finding pieces that feel like you.','F9 Boutique وجهة اكتشاف منتقاة للمرأة في الكويت. نجمع بوتيكات العبايات والأزياء النسائية المستقلة في مساحة واحدة مدروسة، لتقضي وقتاً أقل في البحث ووقتاً أكثر في اكتشاف قطع تشبهك.')}</p><h2>{t('Independent style, thoughtfully gathered.','أناقة مستقلة، مختارة بعناية.')}</h2><p>{t('Our demo collection celebrates fluid silhouettes, beautiful materials and Kuwaiti design perspectives. All boutiques, products and prices shown are illustrative demo content. Editorial imagery is AI-generated.','تحتفي مجموعتنا التجريبية بالقصّات الانسيابية والخامات الجميلة والرؤى الكويتية. جميع البوتيكات والمنتجات والأسعار المعروضة محتوى توضيحي تجريبي. الصور التحريرية مولّدة بالذكاء الاصطناعي.')}</p><button className="btn" onClick={()=>go('boutiques')}>{t('Meet the boutiques','تعرّفي على البوتيكات')}</button></>}
