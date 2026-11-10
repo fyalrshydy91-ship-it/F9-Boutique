@@ -9,11 +9,11 @@ F9 Boutique is a platform gathering multiple independent boutiques, not a single
 
 **How to apply:** Preserve this positioning in imagery, copy, sample products, and future shopping features.
 
-The user wants luxurious model photography and beautiful garment designs while retaining the approved chocolate, champagne, and ivory brand. The requested first version uses demo data and frontend interactions, not real payments or live boutique connections. English is the default, with complete Arabic support and RTL.
+The user wants luxurious model photography and beautiful garment designs while retaining the approved chocolate, champagne, and ivory brand. F9 uses demo catalog content and supports English plus Arabic RTL. Checkout is limited to a fixed $1 USD Stripe sandbox test, never the KWD cart total; there are no real charges or delivery.
 
-**Why:** These are explicit user requirements, including the instruction not to claim unimplemented commerce connections.
+**Why:** The user explicitly requested the $1 test checkout and stated it must not be represented as a real cart-total payment.
 
-**How to apply:** Keep prototype limitations honest; real checkout remains out of scope. The user later explicitly requested real account authentication and private favorites.
+**How to apply:** Keep the test-only amount and no-delivery limitation clear in checkout, order history, and any future commerce work.
 
 Publishing must preserve the approved design exactly, including later readability and navigation-spacing adjustments.
 
@@ -39,8 +39,8 @@ The user later explicitly expanded F9's Supabase scope to email authentication a
 
 **How to apply:** Treat the public/publishable key as safe for browser use, never include an admin/service-role key in `VITE_*`, and keep each customer table limited to the rows belonging to its verified Supabase Auth user.
 
-The user expanded My Orders into an authenticated order-recording flow, with snapshots of catalog items, selected variants, and KWD totals. No real payments or delivery are part of the flow; do not create sample orders.
+The user expanded My Orders into an authenticated order-recording flow, with snapshots of catalog items, selected variants, and KWD totals, then added Stripe sandbox payment verification for a fixed $1 USD test Price. Do not create sample orders or enable live charges.
 
-**Why:** The user explicitly requested checkout order recording, per-user isolation, no service-role exposure, and no payment processing.
+**Why:** The user explicitly requested owner-only orders, server-side Stripe verification, test mode only, and no real charges.
 
-**How to apply:** Verify the access token before reading orders, enforce owner-only SELECT/INSERT with `auth.uid()`, calculate snapshots from the live catalog, and keep customer UPDATE/DELETE blocked. Status starts `Pending`; later status changes require a trusted admin path.
+**How to apply:** Verify the access token, enforce owner-only reads/inserts, calculate snapshots from the live catalog, and keep customer updates blocked. Only the trusted server function may mark a pending order paid after Stripe confirms the matching $1 test session.

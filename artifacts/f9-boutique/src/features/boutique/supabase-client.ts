@@ -10,6 +10,7 @@ type Json =
 
 export type SupabaseJson = Json;
 export type OrderStatus = 'Pending' | 'Processing' | 'Completed' | 'Cancelled';
+export type OrderPaymentStatus = 'not_required' | 'unpaid' | 'paid';
 export type OrderItemSnapshot = {
   product_id: number;
   product_name: string;
@@ -31,6 +32,9 @@ export type OrderRecord = {
   status: OrderStatus;
   total: number;
   currency: string;
+  payment_status: OrderPaymentStatus;
+  stripe_checkout_session_id: string | null;
+  paid_at: string | null;
   items: Json;
   created_at: string;
 };

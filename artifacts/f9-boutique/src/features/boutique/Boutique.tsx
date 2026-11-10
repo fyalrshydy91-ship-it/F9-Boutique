@@ -16,6 +16,13 @@ type Page='home'|'abayas'|'women'|'new'|'boutiques'|'collection'|'product'|'favo
 const PASSWORD_RESET_REDIRECT_URL='https://luxury-model-designs.replit.app/?f9_recovery=1';
 const APPROXIMATE_CURRENCIES=['USD','EUR','GBP','SAR'] as const;
 type PasswordRecoveryUrlState='recovery'|'invalid'|null;
+type PaymentReturn=
+ |{kind:'success';sessionId:string}
+ |{kind:'cancel';orderId:string|null}
+ |null;
+type PaymentNotice={kind:'success'|'error'|'cancel'|'pending';message:string};
+type OrderListRecord=Pick<OrderRecord,'id'|'order_number'|'status'|'total'|'currency'|'payment_status'|'items'|'created_at'>;
+const isUuid=(value:unknown):value is string=>typeof value==='string'&&/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value);
 function getPasswordRecoveryUrlState():PasswordRecoveryUrlState{
  if(typeof window==='undefined')return null;
  const query=new URLSearchParams(window.location.search);
@@ -30,6 +37,25 @@ function getPasswordRecoveryUrlState():PasswordRecoveryUrlState{
  const description=get('error_description');
  if(isRecovery&&(errorCode.startsWith('otp_')||errorCode.includes('flow_state')||errorCode==='invalid_grant'||error==='access_denied'||/email link|expired|invalid|already used|recovery|otp/i.test(`${error} ${description}`)))return 'invalid';
  return isRecovery?'recovery':null;
+}
+function getPaymentReturnFromUrl():PaymentReturn{
+ if(typeof window==='undefined')return null;
+ const query=new URLSearchParams(window.location.search);
+ const payment=query.get('payment');
+ if(payment==='success')return {kind:'success',sessionId:query.get('session_id')??''};
+ if(payment==='cancel')return {kind:'cancel',orderId:isUuid(query.get('order_id'))?query.get('order_id'):null};
+ return null;
+}
+function clearPaymentReturnFromUrl(){
+ if(typeof window==='undefined')return;
+ const url=new URL(window.location.href);
+ for(const key of ['payment','session_id','order_id'])url.searchParams.delete(key);
+ window.history.replaceState(window.history.state,document.title,`${url.pathname}${url.search}`);
+}
+function readCreatedOrderId(value:unknown):string|null{
+ if(!value||typeof value!=='object'||Array.isArray(value))return null;
+ const id=(value as {id?:unknown}).id;
+ return isUuid(id)?id:null;
 }
 function clearSupabaseAuthCallbackFromUrl(){
  if(typeof window==='undefined')return;
@@ -55,6 +81,7 @@ function readOrderItems(value:unknown):OrderItemSnapshot[]{
 }
 export function Boutique({products,boutiques,lang,setLang}:Catalog & {lang:'en'|'ar';setLang:Dispatch<SetStateAction<'en'|'ar'>>}){
  const [initialRecoveryUrlState]=useState<PasswordRecoveryUrlState>(getPasswordRecoveryUrlState);
+  const [paymentReturn,setPaymentReturn]=useState<PaymentReturn>(getPaymentReturnFromUrl);
  const [guestFavorites,setGuestFavorites]=useStore<number[]>('f9-favorites',[]);
  const [favorites,setFavorites]=useState<number[]>([]);
  const [bag,setBag]=useStore<BagItem[]>('f9-bag',[]);
@@ -90,17 +117,25 @@ export function Boutique({products,boutiques,lang,setLang}:Catalog & {lang:'en'|
  const [favoriteLoading,setFavoriteLoading]=useState(false);
  const [favoriteLoadError,setFavoriteLoadError]=useState(false);
  const [favoriteBusyIds,setFavoriteBusyIds]=useState<number[]>([]);
-   const [orders,setOrders]=useState<Array<Omit<OrderRecord,'user_id'>>>([]);
+   const [orders,setOrders]=useState<OrderListRecord[]>([]);
   const [ordersLoading,setOrdersLoading]=useState(false);
   const [ordersLoaded,setOrdersLoaded]=useState(false);
   const [ordersError,setOrdersError]=useState('');
   const [ordersRetry,setOrdersRetry]=useState(0);
    const [orderSubmitting,setOrderSubmitting]=useState(false);
    const [orderSubmitError,setOrderSubmitError]=useState('');
+  const [pendingPaymentOrderId,setPendingPaymentOrderId]=useState<string|null>(()=>{
+   const paymentReturn=getPaymentReturnFromUrl();
+   return paymentReturn?.kind==='cancel'?paymentReturn.orderId:null;
+  });
+  const [paymentNotice,setPaymentNotice]=useState<PaymentNotice|null>(null);
+  const [paymentVerifying,setPaymentVerifying]=useState(false);
+  const [paymentVerificationRetry,setPaymentVerificationRetry]=useState(0);
  const guestFavoritesRef=useRef(guestFavorites);
  const favoriteRequestIds=useRef(new Set<number>());
   const ordersRequestId=useRef(0);
    const orderSubmittingRef=useRef(false);
+  const paymentVerificationStarted=useRef(false);
   const recoveryEventSeen=useRef(false);
  const [dialog,setDialog]=useState<'checkout'|'size'|'demo'|null>(null);
  const [toast,setToast]=useState('');
@@ -189,6 +224,84 @@ export function Boutique({products,boutiques,lang,setLang}:Catalog & {lang:'en'|
    }});
   return()=>{alive=false;subscription.unsubscribe()};
   },[]);
+  useEffect(()=>{
+   if(!paymentReturn)return;
+   if(paymentReturn.kind==='cancel'){
+    setPendingPaymentOrderId(paymentReturn.orderId);
+    setPaymentNotice({kind:'cancel',message:t('Payment was cancelled. No payment was verified, and your bag is still saved.','تم إلغاء الدفع. لم يتم تأكيد أي دفعة، وما زالت حقيبتك محفوظة.')});
+    setPage('orders');
+    clearPaymentReturnFromUrl();
+    setPaymentReturn(null);
+    return;
+   }
+   if(!authReady)return;
+   if(!paymentReturn.sessionId){
+    setPaymentNotice({kind:'error',message:t('We could not verify this Stripe payment because its session details are missing. No order was marked paid.','تعذر التحقق من دفعة Stripe لأن بيانات الجلسة غير موجودة. لم يتم تسجيل الطلب كمدفوع.')});
+    setPage('orders');
+    clearPaymentReturnFromUrl();
+    setPaymentReturn(null);
+    return;
+   }
+   if(!authUser){
+    setPage('account');
+    setAuth('login');
+    setAuthNotice(t('Sign in again to verify your Stripe payment securely.','سجّلي الدخول مجدداً للتحقق من دفعة Stripe بأمان.'));
+    return;
+   }
+   if(paymentVerificationStarted.current)return;
+   paymentVerificationStarted.current=true;
+   let active=true;
+   setPage('orders');
+   setPaymentVerifying(true);
+   setPaymentNotice({kind:'pending',message:t('Verifying your Stripe payment…','جارٍ التحقق من دفعتك مع Stripe…')});
+   void(async()=>{
+    try{
+     const {data:sessionData,error:sessionError}=await supabase.auth.getSession();
+     if(sessionError||!sessionData.session?.access_token||sessionData.session.user.id!==authUser.id){
+      throw Object.assign(new Error('AUTH_REQUIRED'),{code:'AUTH_REQUIRED'});
+     }
+     const {data,error}=await supabase.functions.invoke('create-checkout-session',{
+      body:{action:'verify',session_id:paymentReturn.sessionId},
+     });
+     if(error){
+      const invokeError=error as {status?:number;context?:{status?:number}};
+      if(invokeError.status===401||invokeError.context?.status===401){
+       throw Object.assign(new Error('AUTH_REQUIRED'),{code:'AUTH_REQUIRED'});
+      }
+      throw error;
+     }
+     const result=data as {paid?:unknown;payment_status?:unknown}|null;
+     if(result?.paid!==true||result.payment_status!=='paid')throw new Error('PAYMENT_NOT_VERIFIED');
+     if(!active)return;
+     setBag([]);
+     setPendingPaymentOrderId(null);
+     setPaymentNotice({kind:'success',message:t('Stripe verified the $1 USD test payment. Your order is saved as paid; no real charge was made.','تحققت Stripe من دفعة الاختبار البالغة ١ دولار أمريكي. حُفظ طلبك كمدفوع دون تحصيل مبلغ حقيقي.')});
+     setPage('orders');
+     setOrdersRetry(value=>value+1);
+     clearPaymentReturnFromUrl();
+     setPaymentReturn(null);
+    }catch(error){
+     if(!active)return;
+     const item=error&&typeof error==='object'?error as {code?:string}:{};
+     paymentVerificationStarted.current=false;
+     if(item.code==='AUTH_REQUIRED'){
+      setAuth('login');
+      setAuthNotice(t('Your sign-in expired. Log in again to verify this payment.','انتهت صلاحية تسجيل الدخول. سجّلي الدخول مجدداً للتحقق من هذه الدفعة.'));
+      setAuthUser(null);
+      setAuthSession(null);
+      setPage('account');
+      void supabase.auth.signOut({scope:'local'}).catch(()=>{});
+      return;
+     }
+     setPaymentNotice({kind:'error',message:t('We returned from Stripe but could not verify payment with Stripe. The order was not marked paid. Retry verification or contact support.','عدنا من Stripe لكن تعذر التحقق من الدفع. لم يتم تسجيل الطلب كمدفوع. أعيدي التحقق أو تواصلي مع الدعم.')});
+     setPage('orders');
+     clearPaymentReturnFromUrl();
+    }finally{
+     if(active)setPaymentVerifying(false);
+    }
+   })();
+   return()=>{active=false;paymentVerificationStarted.current=false;setPaymentVerifying(false)};
+  },[paymentReturn,authReady,authUser?.id,paymentVerificationRetry]);
  useEffect(()=>{guestFavoritesRef.current=guestFavorites},[guestFavorites]);
   useEffect(()=>{
    if(page!=='orders'){
@@ -237,19 +350,30 @@ export function Boutique({products,boutiques,lang,setLang}:Catalog & {lang:'en'|
      redirectToLogin();
      return;
     }
-    const {data,error}=await supabase.from('orders')
-     .select('id,order_number,status,total,currency,items,created_at')
+     const {data,error}=await supabase.from('orders')
+      .select('id,order_number,status,total,currency,payment_status,items,created_at')
      .eq('user_id',identity.user.id)
      .order('created_at',{ascending:false});
     if(!active||requestId!==ordersRequestId.current)return;
-    if(error){
-     const databaseError=error as {code?:string;message?:string};
+     let ordersData=data as OrderListRecord[]|null;
+     let ordersQueryError=error;
+     if(error&&(error.code==='42703'||error.code==='PGRST204')){
+      const legacy=await supabase.from('orders')
+       .select('id,order_number,status,total,currency,items,created_at')
+       .eq('user_id',identity.user.id)
+       .order('created_at',{ascending:false});
+      if(!active||requestId!==ordersRequestId.current)return;
+      ordersQueryError=legacy.error;
+      ordersData=(legacy.data??[]).map(order=>({...order,payment_status:'not_required' as const})) as OrderListRecord[];
+     }
+     if(ordersQueryError){
+      const databaseError=ordersQueryError as {code?:string;message?:string};
      if(databaseError.code==='PGRST301'||databaseError.message?.toLowerCase().includes('jwt expired')||databaseError.message?.toLowerCase().includes('invalid jwt')){redirectToLogin();return}
      setOrders([]);setOrdersLoading(false);setOrdersLoaded(true);
      setOrdersError(t('Your orders could not be loaded. Please retry.','تعذر تحميل طلباتك. حاولي مجدداً.'));
      return;
     }
-    setOrders(data??[]);setOrdersLoading(false);setOrdersLoaded(true);setOrdersError('');
+     setOrders(ordersData??[]);setOrdersLoading(false);setOrdersLoaded(true);setOrdersError('');
    })().catch(()=>{
     if(active&&requestId===ordersRequestId.current){
      setOrders([]);setOrdersLoading(false);setOrdersLoaded(true);
@@ -348,9 +472,9 @@ export function Boutique({products,boutiques,lang,setLang}:Catalog & {lang:'en'|
  };
  const signOut=async()=>{if(authBusy)return;setAuthBusy(true);setAuthError('');try{const {error}=await supabase.auth.signOut();if(error)throw error;setAuthNotice(t('You are signed out. Guest favorites remain on this device.','تم تسجيل خروجك. تبقى مفضلة الزائرة محفوظة على هذا الجهاز.'))}catch(error){setAuthError(friendlyAuthError(error))}finally{setAuthBusy(false)}};
  const toggleCompare=(id:number)=>{if(compare.includes(id)){setCompare(compare.filter(n=>n!==id));return}if(compare.length>=3){notify(t('Compare up to 3 pieces at a time','يمكن مقارنة ٣ قطع كحد أقصى'));return}setCompare([...compare,id]);notify(t('Added to your comparison','تمت الإضافة للمقارنة'))};
- const addToBag=()=>{if(!size){notify(t('Please choose your size first','يرجى اختيار المقاس أولاً'));return}setBag(old=>{const found=old.find(b=>b.id===product.id&&b.size===size&&b.color===color);return found?old.map(b=>b===found?{...b,qty:b.qty+1}:b):[...old,{id:product.id,size,color,qty:1}]});notify(t('A beautiful choice. Added to your bag.','اختيار جميل. تمت الإضافة إلى حقيبتك.'))};
- const updateQty=(index:number,delta:number)=>{setBag(old=>old.map((b,i)=>i===index?{...b,qty:Math.max(1,b.qty+delta)}:b));notify(t('Bag updated','تم تحديث الحقيبة'))};
- const removeBag=(index:number)=>{setBag(old=>old.filter((_,i)=>i!==index));notify(t('Piece removed from your bag','تمت إزالة القطعة من الحقيبة'))};
+  const addToBag=()=>{if(!size){notify(t('Please choose your size first','يرجى اختيار المقاس أولاً'));return}setPendingPaymentOrderId(null);setPaymentNotice(null);setBag(old=>{const found=old.find(b=>b.id===product.id&&b.size===size&&b.color===color);return found?old.map(b=>b===found?{...b,qty:b.qty+1}:b):[...old,{id:product.id,size,color,qty:1}]});notify(t('A beautiful choice. Added to your bag.','اختيار جميل. تمت الإضافة إلى حقيبتك.'))};
+  const updateQty=(index:number,delta:number)=>{setPendingPaymentOrderId(null);setPaymentNotice(null);setBag(old=>old.map((b,i)=>i===index?{...b,qty:Math.max(1,b.qty+delta)}:b));notify(t('Bag updated','تم تحديث الحقيبة'))};
+ const removeBag=(index:number)=>{setPendingPaymentOrderId(null);setPaymentNotice(null);setBag(old=>old.filter((_,i)=>i!==index));notify(t('Piece removed from your bag','تمت إزالة القطعة من الحقيبة'))};
   const requireOrderLogin=()=>{
    setDialog(null);
    setAuth('login');
@@ -370,29 +494,66 @@ export function Boutique({products,boutiques,lang,setLang}:Catalog & {lang:'en'|
    setOrderSubmitting(true);
    setOrderSubmitError('');
    try{
-    const pOrderItems=bag.map(({id,size,color,qty})=>({product_id:id,size,color,qty})) as SupabaseJson;
-    const {error}=await supabase.rpc('place_f9_order',{p_order_items:pOrderItems});
+    let orderId=pendingPaymentOrderId;
+    if(!orderId){
+     const pOrderItems=bag.map(({id,size,color,qty})=>({product_id:id,size,color,qty})) as SupabaseJson;
+     const {data,error}=await supabase.rpc('place_f9_order',{p_order_items:pOrderItems});
+     if(error){
+      const item=error as {code?:string;message?:string};
+      const message=(item.message??'').toLowerCase();
+      if(item.code==='42501'||message.includes('sign in')||message.includes('jwt')){
+       requireOrderLogin();
+       return;
+      }
+      if(message.includes('no longer available')||message.includes('selected size')||message.includes('selected color')){
+       setOrderSubmitError(t('A product or option in your bag is no longer available. Review your bag and try again.','أحد المنتجات أو الخيارات في حقيبتك لم يعد متاحاً. راجعي حقيبتك ثم حاولي مجدداً.'));
+       return;
+      }
+      setOrderSubmitError(t('We could not save your order. Your bag is unchanged; please try again.','تعذر حفظ طلبك. لم تتغير حقيبتك؛ حاولي مجدداً.'));
+      return;
+     }
+     orderId=readCreatedOrderId(data);
+     if(!orderId){
+      setOrderSubmitError(t('Your order could not be identified for checkout. Your bag is unchanged; please retry.','تعذر تحديد طلبك للدفع. لم تتغير حقيبتك؛ حاولي مجدداً.'));
+      return;
+     }
+     setPendingPaymentOrderId(orderId);
+    }
+    const {data,error}=await supabase.functions.invoke('create-checkout-session',{
+     body:{action:'create',order_id:orderId},
+    });
     if(error){
-     const item=error as {code?:string;message?:string};
-     const message=(item.message??'').toLowerCase();
-     if(item.code==='42501'||message.includes('sign in')||message.includes('jwt')){
+     const invokeError=error as {status?:number;context?:{status?:number}};
+     if(invokeError.status===401||invokeError.context?.status===401){
       requireOrderLogin();
       return;
      }
-     if(message.includes('no longer available')||message.includes('selected size')||message.includes('selected color')){
-      setOrderSubmitError(t('A product or option in your bag is no longer available. Review your bag and try again.','أحد المنتجات أو الخيارات في حقيبتك لم يعد متاحاً. راجعي حقيبتك ثم حاولي مجدداً.'));
-      return;
-     }
-     setOrderSubmitError(t('We could not record your order. Your bag is unchanged; please try again.','تعذر تسجيل طلبك. لم تتغير حقيبتك؛ حاولي مجدداً.'));
+     setOrderSubmitError(t('Stripe test checkout is unavailable. Your bag and saved order are unchanged; please retry.','دفع Stripe التجريبي غير متاح. بقيت حقيبتك وطلبك محفوظين؛ حاولي مجدداً.'));
      return;
     }
-    setBag([]);
+    const response=data as {checkout_url?:unknown;paid?:unknown;payment_status?:unknown}|null;
+    if(response?.paid===true&&response.payment_status==='paid'){
+     setBag([]);
+     setPendingPaymentOrderId(null);
+     setPaymentNotice({kind:'success',message:t('Stripe verified the $1 USD test payment. Your order is saved as paid; no real charge was made.','تحققت Stripe من دفعة الاختبار البالغة ١ دولار أمريكي. حُفظ طلبك كمدفوع دون تحصيل مبلغ حقيقي.')});
+     setDialog(null);
+     setPage('orders');
+     setOrdersRetry(value=>value+1);
+     return;
+    }
+    if(typeof response?.checkout_url!=='string'){
+     setOrderSubmitError(t('Stripe did not return a checkout link. Your bag is unchanged; please retry.','لم يُرجع Stripe رابط الدفع. لم تتغير حقيبتك؛ حاولي مجدداً.'));
+     return;
+    }
+    let redirectUrl:URL;
+    try{redirectUrl=new URL(response.checkout_url)}catch{throw new Error('INVALID_CHECKOUT_URL')}
+    if(redirectUrl.protocol!=='https:'||redirectUrl.hostname!=='checkout.stripe.com'){
+     throw new Error('INVALID_CHECKOUT_URL');
+    }
     setOrderSubmitError('');
-    setDialog(null);
-    go('orders');
-    notify(t('Your order was recorded. No payment was taken.','تم تسجيل طلبك. لم يتم تحصيل أي مبلغ.'));
+    window.location.assign(redirectUrl.toString());
    }catch{
-    setOrderSubmitError(t('We could not reach the order service. Your bag is unchanged; check your connection and retry.','تعذر الاتصال بخدمة الطلبات. لم تتغير حقيبتك؛ تحققي من الاتصال ثم حاولي مجدداً.'));
+    setOrderSubmitError(t('We could not start or verify Stripe test checkout. Your bag is unchanged; please retry.','تعذر بدء أو التحقق من دفع Stripe التجريبي. لم تتغير حقيبتك؛ حاولي مجدداً.'));
    }finally{
     orderSubmittingRef.current=false;
     setOrderSubmitting(false);
@@ -503,7 +664,7 @@ export function Boutique({products,boutiques,lang,setLang}:Catalog & {lang:'en'|
        <div className="summary-line"><span>{t('Delivery','التوصيل')}</span><span>{t('By boutique','حسب البوتيك')}</span></div>
        <div className="summary-line total"><span>{t('Item total','إجمالي القطع')}</span><span>{money(total)}</span></div>
        <button className="btn" data-testid="button-review-order" onClick={()=>{setOrderSubmitError('');setDialog('checkout')}}>{t('REVIEW ORDER','مراجعة الطلب')}<ArrowRight/></button>
-       <p>{t('Order recording only. No payment or delivery is provided. Final delivery fees are not calculated.','تسجيل الطلبات فقط. لا يتم تحصيل أي مبلغ أو توفير التوصيل. لا تُحسب رسوم التوصيل النهائية.')}</p>
+        <p>{t('Stripe sandbox test checkout only: fixed $1 USD, not your KWD cart total. No real charge or delivery.','دفع Stripe تجريبي فقط: مبلغ ثابت ١ دولار أمريكي، وليس إجمالي الحقيبة بالدينار. لا يوجد تحصيل حقيقي أو توصيل.')}</p>
        <button className="text-link" style={{marginTop:20}} onClick={()=>go('new')}>{t('Continue discovering','متابعة الاكتشاف')}</button>
       </aside>
      </div>
@@ -560,6 +721,10 @@ export function Boutique({products,boutiques,lang,setLang}:Catalog & {lang:'en'|
   </section>}
   {page==='orders'&&<section className="orders-page">
    <div className="page-intro"><span className="eyebrow">{t('YOUR PRIVATE ACCOUNT','حسابك الخاص')}</span><h1>{title('orders')}</h1><p>{t('A private record of orders placed with F9 boutiques.','سجل خاص بالطلبات التي تمت لدى بوتيكات F9.')}</p></div>
+    {paymentNotice&&<div className={paymentNotice.kind==='error'?'auth-error':'auth-notice'} role={paymentNotice.kind==='error'?'alert':'status'} aria-live="polite" data-testid="status-payment-result">
+     {paymentVerifying?t('Verifying your payment with Stripe…','جارٍ التحقق من دفعتك مع Stripe…'):paymentNotice.message}
+     {paymentNotice.kind==='error'&&paymentReturn?.kind==='success'&&<button className="text-link" type="button" disabled={paymentVerifying} onClick={()=>{paymentVerificationStarted.current=false;setPaymentVerificationRetry(value=>value+1)}}>{paymentVerifying?t('Verifying…','جارٍ التحقق…'):t('Retry verification','إعادة التحقق')}</button>}
+    </div>}
    {!authReady||ordersLoading||(!ordersLoaded&&!ordersError)
     ?<div className="empty" role="status"><PackageCheck/><p>{t('Verifying your sign-in and loading orders…','جارٍ التحقق من تسجيل الدخول وتحميل الطلبات…')}</p></div>
     :ordersError
@@ -572,6 +737,7 @@ export function Boutique({products,boutiques,lang,setLang}:Catalog & {lang:'en'|
        const totalLabel=new Intl.NumberFormat(ar?'ar-KW':'en-KW',{style:'currency',currency:order.currency}).format(Number(order.total));
        const createdAt=new Intl.DateTimeFormat(ar?'ar-KW':'en-KW',{dateStyle:'medium'}).format(new Date(order.created_at));
         const statusLabel=order.status==='Pending'?t('Pending','قيد الانتظار'):order.status==='Processing'?t('Processing','قيد المعالجة'):order.status==='Completed'?t('Completed','مكتمل'):t('Cancelled','ملغي');
+        const paymentStatusLabel=order.payment_status==='paid'?t('Paid · $1 test','مدفوع · اختبار ١ دولار'):order.payment_status==='unpaid'?t('Payment pending','الدفع قيد الانتظار'):t('No payment required','لا يتطلب دفعاً');
        return <article className="order-card" key={order.id}>
          <div className="order-card-top">
           <div><span className="eyebrow">{t('ORDER','طلب')}</span><h2 dir="ltr" data-testid={`text-order-number-${order.id}`}>{order.order_number}</h2></div>
@@ -580,6 +746,7 @@ export function Boutique({products,boutiques,lang,setLang}:Catalog & {lang:'en'|
          <div className="order-card-details">
           <span><time dateTime={order.created_at}>{createdAt}</time></span>
           <span>{itemCount} {itemCount===1?t('item','قطعة'):t('items','قطع')}</span>
+           <span data-testid={`status-payment-${order.id}`}>{paymentStatusLabel}</span>
           <strong>{totalLabel}</strong>
          </div>
          <div className="order-items">
@@ -609,7 +776,7 @@ export function Boutique({products,boutiques,lang,setLang}:Catalog & {lang:'en'|
   </>}
   {page==='terms'&&<>
    <h2>{t('A fashion discovery prototype.','نموذج لاكتشاف الأزياء.')}</h2>
-   <p>{t('Products, boutiques, availability and prices are illustrative. Orders are recorded for account history only; no payment is charged and no purchase contract or delivery is created.','المنتجات والبوتيكات والتوفر والأسعار توضيحية. تُسجل الطلبات في سجل الحساب فقط؛ لا يتم تحصيل أي مبلغ ولا ينشأ عقد شراء أو توصيل.')}</p>
+   <p>{t('Products, boutiques, availability and KWD cart totals are illustrative. Checkout is Stripe sandbox only: a fixed $1 USD test payment, not the cart total. No real charge or delivery is created.','المنتجات والبوتيكات والتوفر وإجمالي الحقيبة بالدينار توضيحية. الدفع عبر Stripe تجريبي فقط بمبلغ ثابت ١ دولار أمريكي، وليس إجمالي الحقيبة. لا يتم تحصيل مبلغ حقيقي أو توفير التوصيل.')}</p>
    <h2>{t('Before a real purchase','قبل أي شراء فعلي')}</h2>
    <p>{t('Each boutique would confirm its own garment measurements, stock, delivery charges and return policy before any real purchase. This prototype makes no shipping or return promises.','يؤكد كل بوتيك مقاسات الملابس والمخزون ورسوم التوصيل وسياسة الاسترجاع قبل أي شراء فعلي. لا يقدم هذا النموذج وعوداً بالشحن أو الاسترجاع.')}</p>
   </>}
@@ -623,7 +790,7 @@ export function Boutique({products,boutiques,lang,setLang}:Catalog & {lang:'en'|
      <div className="footer-links"><span className="eyebrow">{t('DISCOVER','اكتشفي')}</span><button onClick={()=>go('abayas')}>{t('Abayas','العبايات')}</button><button onClick={()=>go('women')}>{t('Women’s Clothing','الملابس النسائية')}</button><button onClick={()=>go('boutiques')}>{t('Our boutiques','بوتيكاتنا')}</button><button onClick={()=>go('new')}>{t('New arrivals','وصل حديثاً')}</button></div>
      <div className="footer-links"><span className="eyebrow">{t('THE FINER DETAILS','التفاصيل المهمة')}</span>{(['about','contact','instagram','privacy','terms'] as Page[]).map(p=><button key={p} onClick={()=>go(p)}>{p==='about'?t('About us','من نحن'):p==='contact'?t('Contact us','تواصلي معنا'):p==='instagram'?t('Instagram','إنستغرام'):p==='privacy'?t('Privacy policy','سياسة الخصوصية'):t('Terms & conditions','الشروط والأحكام')}</button>)}</div>
     </div>
-    <div className="footer-bottom"><span>© {new Date().getFullYear()} F9 BOUTIQUE. {t('ALL RIGHTS RESERVED.','جميع الحقوق محفوظة.')}</span><span>{t('KUWAIT · KWD  /  ORDER RECORDING · NO PAYMENT','الكويت · د.ك / تسجيل الطلبات · بلا مدفوعات')}</span></div>
+    <div className="footer-bottom"><span>© {new Date().getFullYear()} F9 BOUTIQUE. {t('ALL RIGHTS RESERVED.','جميع الحقوق محفوظة.')}</span><span>{t('STRIPE SANDBOX · $1 USD TEST · NO REAL CHARGE','Stripe تجريبي · اختبار ١ دولار · دون تحصيل حقيقي')}</span></div>
    </footer>
   {compare.length>0&&page!=='compare'&&<div className="compare-bar"><Scale/><span>{compare.length}/3 {t('pieces selected','قطع مختارة')}</span><button className="btn" onClick={()=>go('compare')}>{t('Compare pieces','مقارنة القطع')}<ArrowRight/></button><button className="icon-btn" onClick={()=>setCompare([])} aria-label={t('Clear comparison','مسح المقارنة')}><X/></button></div>}
   {toast&&<div className="toast" role="status"><Check/><span>{toast}</span><button className="icon-btn" onClick={()=>setToast('')} aria-label={t('Dismiss','إغلاق')}><X/></button></div>}
@@ -641,7 +808,7 @@ export function Boutique({products,boutiques,lang,setLang}:Catalog & {lang:'en'|
       ?<>
        <span className="eyebrow">{t('YOUR EDIT, REVIEWED','مراجعة مختاراتك')}</span>
        <h2>{t('Beautifully considered.','مختارة بذوق.')}</h2>
-       <p>{t('This order will be recorded in your account. No payment is charged and no delivery is arranged.','سيتم تسجيل هذا الطلب في حسابك. لا يتم تحصيل أي مبلغ أو ترتيب التوصيل.')}</p>
+        <p>{t('Your KWD cart total is saved with the order. Stripe sandbox will process a fixed $1 USD test payment—not the cart total. No real charge or delivery.','يُحفظ إجمالي حقيبتك بالدينار مع الطلب. سيعالج Stripe التجريبي دفعة ثابتة قدرها ١ دولار أمريكي، وليست إجمالي الحقيبة. لا يوجد تحصيل حقيقي أو توصيل.')}</p>
        <div className="checkout-items" data-testid="list-checkout-items">
         {checkoutEntries.map(({id,size,color,qty,product},index)=>product
          ?<div className="checkout-item" key={`${id}-${size}-${color}-${index}`}>
@@ -655,10 +822,10 @@ export function Boutique({products,boutiques,lang,setLang}:Catalog & {lang:'en'|
        {orderSubmitError&&<p className="auth-error" role="alert" data-testid="status-order-submit-error">{orderSubmitError}</p>}
        {authReady&&authUser&&authSession?.access_token
         ?<button className="btn" type="button" data-testid="button-place-order" onClick={()=>void placeOrder()} disabled={!checkoutValid||orderSubmitting} aria-busy={orderSubmitting}>
-         {orderSubmitting?t('RECORDING ORDER…','جارٍ تسجيل الطلب…'):t('PLACE ORDER','تسجيل الطلب')}<ArrowRight/>
+          {orderSubmitting?t('STARTING TEST CHECKOUT…','جارٍ بدء الدفع التجريبي…'):t('PAY $1 TEST CHECKOUT','الدفع التجريبي · ١ دولار')}<ArrowRight/>
         </button>
         :<button className="btn" type="button" data-testid="button-login-to-place-order" onClick={requireOrderLogin} disabled={!authReady||orderSubmitting} aria-busy={!authReady}>
-         {!authReady?t('CHECKING ACCOUNT…','جارٍ التحقق من الحساب…'):t('SIGN IN TO PLACE ORDER','سجّلي الدخول لتسجيل الطلب')}<ArrowRight/>
+          {!authReady?t('CHECKING ACCOUNT…','جارٍ التحقق من الحساب…'):t('SIGN IN TO PAY $1 TEST CHECKOUT','سجّلي الدخول للدفع التجريبي · ١ دولار')}<ArrowRight/>
         </button>}
        <button className="text-link" type="button" onClick={()=>{if(!orderSubmittingRef.current)setDialog(null)}} disabled={orderSubmitting}>{t('Back to my bag','العودة إلى حقيبتي')}</button>
       </>
