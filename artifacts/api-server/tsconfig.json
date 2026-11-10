@@ -11,6 +11,7 @@
         "node_modules/@types/express-serve-static-core/index.d.ts"
       ]
     },
+    "lib": ["es2022", "dom"],
     "types": ["node"]
   },
   "include": ["src"],
