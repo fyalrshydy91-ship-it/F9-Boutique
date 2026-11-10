@@ -1,2 +1,2 @@
-- [F9 Boutique scope](f9-boutique-scope.md) — multi-boutique womenswear, approved design, live API/AI and Supabase catalog exceptions to demo-only commerce.
+- [F9 Boutique scope](f9-boutique-scope.md) — multi-boutique womenswear and approved design; live APIs, Supabase accounts/orders, and fixed $1 Stripe sandbox only.
 - [Browser pending checks](browser-pending-tests.md) — hold mocked responses with a deferred barrier; fixed delays across browser actions can falsely suggest broken guards.
